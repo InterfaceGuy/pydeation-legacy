@@ -3,4 +3,4 @@ this file is used to simplify importing the necessary modules for video scriptin
 this way we just have to include "from pydeationlib.imports import *" in our scripts
 """
 
-from pydeationlib.scene import *
+from pydeationlib.scene.scene import *
