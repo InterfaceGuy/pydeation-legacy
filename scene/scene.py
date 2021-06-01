@@ -45,7 +45,10 @@ class Scene():
 
         doc.SetDocumentName(self.scene_name)
         InsertBaseDocument(doc)  # insert document in menu list
+
+        # scene wide attributes
         self.time = 0
+        self.live_cobjects = []
 
     def save(self, doc=document):
         # save the scene to project file
@@ -59,7 +62,7 @@ class Scene():
         return frame
 
     @staticmethod
-    def make_keyframe(baseobject, t_ids, dtypes, value, time):
+    def make_keyframe(cobject, t_ids, dtypes, value, time):
         # utility function for making keyframing less cluttered
         # pass in the form of t_ids = [id1, id2, ...], dtypes = [dtype1, dtype2, ...] if more than one desc level
         if type(t_ids) == list and type(dtypes) == list:
@@ -73,11 +76,11 @@ class Scene():
         # get descId
         descId = c4d.DescID(*desc_levels)
         # find corresponding ctrack and if empty create it
-        track = baseobject.FindCTrack(descId)
+        track = cobject.FindCTrack(descId)
         if track == None:
-            track = c4d.CTrack(baseobject, descId)
+            track = c4d.CTrack(cobject, descId)
             # insert ctrack into objects timeline
-            baseobject.InsertTrackSorted(track)
+            cobject.InsertTrackSorted(track)
         # get curve of ctrack
         curve = track.GetCurve()
         # add key
@@ -93,12 +96,52 @@ class Scene():
         # update c4d
         c4d.EventAdd()
 
+    @staticmethod
+    def make_iterable(cobjects):
+        # make sure input is iterable
+        if type(cobjects) is not list:
+            return [cobjects]
+        else:
+            return cobjects
+
     def wait(self, seconds=1):
         self.time += seconds
 
-    def add(self, baseobject):
-        # inserts the object into the scene at given point in time
-        self.make_keyframe(baseobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                           dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
-        self.make_keyframe(baseobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                           dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
+    def add(self, cobjects):
+        # inserts cobjects into scene at given point in time
+
+        cobjects = self.make_iterable(cobjects)
+
+        for cobject in cobjects:
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
+
+            # add cobjects to live cobjects
+            self.live_cobjects.append(cobject)
+
+    def remove(self, cobjects):
+        # removes cobjects from scene at given point in time
+
+        cobjects = self.make_iterable(cobjects)
+
+        for cobject in cobjects:
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
+
+            # remove cobjects from live cobjects
+            self.live_cobjects.remove(cobject)
+
+    def clear(self):
+        # removes all cobjects from scene at given point in time
+        for cobject in self.live_cobjects:
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
+
+        # remove cobjects from live cobjects
+        self.live_cobjects = []
