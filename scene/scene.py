@@ -12,10 +12,7 @@ class Scene():
     NOTE: maybe use BatchRender in the future
     """
 
-    # create document as class variable so it is accessible in CObject class
-    document = BaseDocument()
-
-    def __init__(self, project_name, doc=document):
+    def __init__(self, project_name):
         # following code obsolete but kept as reference for future efforts
         """
         path = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +23,7 @@ class Scene():
         self.project_name = project_name
         # use subclass name for scene's name for saving c4d project file
         self.scene_name = self.__class__.__name__
+        self.doc = BaseDocument()
         # this gives us the path of the project to store our individual scene files in
         self.project_path = os.path.join(PROJECTS_PATH, self.project_name)
         self.scene_path = os.path.join(
@@ -43,16 +41,17 @@ class Scene():
         # except FileNotFoundError:
         #   print("wrong tail: " + tail)
 
-        doc.SetDocumentName(self.scene_name)
-        InsertBaseDocument(doc)  # insert document in menu list
+        self.doc.SetDocumentName(self.scene_name)
+        InsertBaseDocument(self.doc)  # insert document in menu list
 
-        # scene wide attributes
+        # scene-wide attributes
         self.time = 0
-        self.live_cobjects = []
+        self.kairos = []
+        self.chronos = []
 
-    def save(self, doc=document):
+    def save(self):
         # save the scene to project file
-        SaveProject(doc, c4d.SAVEPROJECT_ASSETS |
+        SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
                     c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
 
     def get_frame(self):
@@ -104,6 +103,25 @@ class Scene():
         else:
             return cobjects
 
+    def check_kairos(self, cobject):
+        # checks whether object is in kairos and if not adds it
+        if (cobject in self.kairos):
+            pass
+        else:
+
+            # add object to project file
+            self.doc.InsertObject(cobject.obj)
+
+            # defaults visibility to hidden at frame 0
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
+            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
+                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
+
+            c4d.EventAdd()
+
+            self.kairos.append(cobject)
+
     def wait(self, seconds=1):
         self.time += seconds
 
@@ -113,13 +131,16 @@ class Scene():
         cobjects = self.make_iterable(cobjects)
 
         for cobject in cobjects:
+
+            self.check_kairos(cobject)
+
             self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
                                dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
             self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
                                dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
 
             # add cobjects to live cobjects
-            self.live_cobjects.append(cobject)
+            self.chronos.append(cobject)
 
     def remove(self, cobjects):
         # removes cobjects from scene at given point in time
@@ -133,15 +154,15 @@ class Scene():
                                dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
 
             # remove cobjects from live cobjects
-            self.live_cobjects.remove(cobject)
+            self.chronos.remove(cobject)
 
     def clear(self):
         # removes all cobjects from scene at given point in time
-        for cobject in self.live_cobjects:
+        for cobject in self.chronos:
             self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
                                dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
             self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
                                dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
 
         # remove cobjects from live cobjects
-        self.live_cobjects = []
+        self.chronos.clear()

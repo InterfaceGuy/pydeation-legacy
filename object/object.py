@@ -8,24 +8,13 @@ TODO: find way for not having to pass doc
 class CObject():
     """abstract class for adding objects to scene"""
 
-    def __init__(self, doc=Scene.document):
+    def __init__(self):
 
         # check if primitive type changed by child class
         if hasattr(self, "prim"):
             self.obj = c4d.BaseObject(self.prim)
         else:
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
-        # add object to project file
-        self.doc = doc
-        self.doc.InsertObject(self.obj)
-
-        # defaults visibility to hidden at frame 0
-        Scene.make_keyframe(self.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                            dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
-        Scene.make_keyframe(self.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                            dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
-
-        c4d.EventAdd()
 
 
 class Sphere(CObject):
