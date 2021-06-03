@@ -96,33 +96,21 @@ class Scene():
         c4d.EventAdd()
 
     @staticmethod
-    def make_keyframes(desIds, values, time, *cobjects):
+    def make_keyframes(curves, values, time):
         # utility function for making keyframing less cluttered
-        # pass in the form of descIds = [desc_x, desc_y, desc_z, ...], values = [val_x, val_y, val_z, ...]
-        for cobject in cobjects:
-            # find corresponding ctracks and if empty create them
-            tracks = []
-            for descId in descIds:
-                track = cobject.FindCTrack(descId)
-                if track == None:
-                    track = c4d.CTrack(cobject, descId)
-                    # insert ctrack into objects timeline
-                    cobject.InsertTrackSorted(track)
-                tracks.append(track)
-            # get curves of ctracks
-            curves = [track.GetCurve() for track in tracks]
-            # add keys
-            keys = [curve.AddKey(c4d.BaseTime(time))["key"]
-                    for curve in curves]
-            # assign value to keys
-            if values is not None:
-                for key, curve, value in zip(keys, curves, values):
-                    if type(value) == int:
-                        key.SetGeData(curve, value)
-                    elif type(value) == float:
-                        key.SetValue(curve, value)
-                    else:
-                        raise TypeError("value type must be int or float")
+
+        # add keys
+        keys = [curve.AddKey(c4d.BaseTime(time))["key"]
+                for curve in curves]
+        # assign value to keys
+        if values is not None:
+            for key, curve, value in zip(keys, curves, values):
+                if type(value) is int:
+                    key.SetGeData(curve, value)
+                elif type(value) is float:
+                    key.SetValue(curve, value)
+                else:
+                    raise TypeError("value type must be int or float")
 
         # update c4d
         c4d.EventAdd()
@@ -187,12 +175,13 @@ class Scene():
         # remove cobjects from live cobjects
         self.chronos.clear()
 
-    def play(self, descIds, values, *cobjects, run_time=1):
-        # plays animation acting on cobjects
+    def play(self, curves, values, run_time=1):
+        # plays animation of cobject
 
+        print(values)
         # keyframe current state
-        self.make_keyframes(descIds, values=None, time=self.time, *cobjects)
+        self.make_keyframes(curves, None, self.time)
         self.time += run_time
 
         # keyframe desired state
-        self.make_keyframes(descIds, values, time=self.time, *cobjects)
+        self.make_keyframes(curves, values, self.time)
