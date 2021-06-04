@@ -49,6 +49,9 @@ class Scene():
         self.kairos = []
         self.chronos = []
 
+        # set doc time to zero
+        self.set_time(0)
+
     def save(self):
         # save the scene to project file
         SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
@@ -56,9 +59,22 @@ class Scene():
 
     def get_frame(self):
         # returns the frame corresponding to the current time
-        fps = self.document.GetFps()
+        fps = self.doc.GetFps()
         frame = fps * self.time
         return frame
+
+    @staticmethod
+    def get_curve(cobject, descId):
+        # returns the corresponding curve of the descId
+        track = cobject.obj.FindCTrack(descId)
+        if track is None:
+            track = c4d.CTrack(cobject.obj, descId)
+            # insert ctrack into objects timeline
+            cobject.obj.InsertTrackSorted(track)
+
+        curve = track.GetCurve()
+
+        return curve
 
     @staticmethod
     def make_keyframe(cobject, t_ids, dtypes, value, time):
@@ -95,47 +111,63 @@ class Scene():
         # update c4d
         c4d.EventAdd()
 
-    @staticmethod
-    def make_keyframes(curves, values, time):
+    def make_keyframes(self, cobject, descIds):
         # utility function for making keyframing less cluttered
 
-        # add keys
-        keys = [curve.AddKey(c4d.BaseTime(time))["key"]
-                for curve in curves]
-        # assign value to keys
-        if values is not None:
-            for key, curve, value in zip(keys, curves, values):
-                if type(value) is int:
-                    key.SetGeData(curve, value)
-                elif type(value) is float:
-                    key.SetValue(curve, value)
-                else:
-                    raise TypeError("value type must be int or float")
+        # get curves from descIds
+        curves = [self.get_curve(cobject, descId) for descId in descIds]
+        values = [self.get_value(cobject, descId) for descId in descIds]
+        # add keys and set values
+        for curve, value in zip(curves, values):
+            key = curve.AddKey(self.get_time())["key"]
+            key.SetValue(curve, value)
 
-        # update c4d
         c4d.EventAdd()
+
+    def set_values(self, cobject, descIds, values):
+        # sets the values for the corresponding descIds for given cobject
+
+        # turn descId into paramId
+        paramIds = [(descId[0].id, descId[1].id) for descId in descIds]
+        # set values for params
+        for paramId, value in zip(paramIds, values):
+            cobject.obj[paramId] = value
+
+    def get_value(self, cobject, descId):
+        # gets the value for the corresponding descId for given cobject
+
+        # turn descId into paramId
+        paramId = (descId[0].id, descId[1].id)
+        # read out value
+        value = cobject.obj[paramId]
+
+        return value
+
+    def set_time(self, time):
+        if type(time) is float or type(time) is int:
+            time = c4d.BaseTime(time)
+        self.doc.SetTime(time)
+
+    def get_time(self):
+        return self.doc.GetTime()
+
+    def add_time(self, run_time):
+        time_ini = self.get_time()
+        time_fin = time_ini + c4d.BaseTime(run_time)
+        self.set_time(time_fin)
 
     def check_kairos(self, cobject):
         # checks whether object is in kairos and if not adds it
         if (cobject in self.kairos):
             pass
         else:
-
-            # add object to project file
+            # add object to kairos
             self.doc.InsertObject(cobject.obj)
-
-            # defaults visibility to hidden at frame 0
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=0)
-
             c4d.EventAdd()
-
             self.kairos.append(cobject)
 
-    def wait(self, seconds=1):
-        self.time += seconds
+    def wait(self, time=1):
+        self.add_time(time)
 
     def add(self, *cobjects):
         # inserts cobjects into scene at given point in time
@@ -175,13 +207,13 @@ class Scene():
         # remove cobjects from live cobjects
         self.chronos.clear()
 
-    def play(self, curves, values, run_time=1):
+    def play(self, cobject, values, descIds, run_time=1):
         # plays animation of cobject
 
-        print(values)
         # keyframe current state
-        self.make_keyframes(curves, None, self.time)
-        self.time += run_time
-
+        self.make_keyframes(cobject, descIds)
+        # add run_time
+        self.add_time(run_time)
+        self.set_values(cobject, descIds, values)
         # keyframe desired state
-        self.make_keyframes(curves, values, self.time)
+        self.make_keyframes(cobject, descIds)
