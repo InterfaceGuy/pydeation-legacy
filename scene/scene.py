@@ -49,99 +49,21 @@ class Scene():
         self.kairos = []
         self.chronos = []
 
-        # set doc time to zero
+    def finish(self):
+        # set maximum time to time after last animation
+        self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
+        # set time to frame 0
         self.set_time(0)
-
-    def save(self):
         # save the scene to project file
         SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
                     c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
+        c4d.EventAdd()
 
     def get_frame(self):
         # returns the frame corresponding to the current time
         fps = self.doc.GetFps()
-        frame = fps * self.time
+        frame = self.get_time().GetFrame(fps)
         return frame
-
-    @staticmethod
-    def get_curve(cobject, descId):
-        # returns the corresponding curve of the descId
-        track = cobject.obj.FindCTrack(descId)
-        if track is None:
-            track = c4d.CTrack(cobject.obj, descId)
-            # insert ctrack into objects timeline
-            cobject.obj.InsertTrackSorted(track)
-
-        curve = track.GetCurve()
-
-        return curve
-
-    @staticmethod
-    def make_keyframe(cobject, t_ids, dtypes, value, time):
-        # utility function for making keyframing less cluttered
-        # pass in the form of t_ids = [id1, id2, ...], dtypes = [dtype1, dtype2, ...] if more than one desc level
-        if type(t_ids) == list and type(dtypes) == list:
-            desc_levels = [c4d.DescLevel(t_id, dtype, 0)
-                           for t_id, dtype in zip(t_ids, dtypes)]
-        elif type(t_ids) == int and type(dtypes) == int:
-            desc_levels = [c4d.DescLevel(t_ids, dtypes, 0)]
-        else:
-            raise TypeError(
-                "both t_ids and dtypes have to be either list or int")
-        # get descId
-        descId = c4d.DescID(*desc_levels)
-        # find corresponding ctrack and if empty create it
-        track = cobject.FindCTrack(descId)
-        if track == None:
-            track = c4d.CTrack(cobject, descId)
-            # insert ctrack into objects timeline
-            cobject.InsertTrackSorted(track)
-        # get curve of ctrack
-        curve = track.GetCurve()
-        # add key
-        key = curve.AddKey(c4d.BaseTime(time))["key"]
-        # assign value to key
-        if type(value) == int:
-            key.SetGeData(curve, value)
-        elif type(value) == float:
-            key.SetValue(curve, value)
-        else:
-            raise TypeError("value type must be int or float")
-
-        # update c4d
-        c4d.EventAdd()
-
-    def make_keyframes(self, cobject, descIds):
-        # utility function for making keyframing less cluttered
-
-        # get curves from descIds
-        curves = [self.get_curve(cobject, descId) for descId in descIds]
-        values = [self.get_value(cobject, descId) for descId in descIds]
-        # add keys and set values
-        for curve, value in zip(curves, values):
-            key = curve.AddKey(self.get_time())["key"]
-            key.SetValue(curve, value)
-
-        c4d.EventAdd()
-
-    def set_values(self, cobject, descIds, values):
-        # sets the values for the corresponding descIds for given cobject
-
-        # turn descId into paramId
-        paramIds = [(descId[0].id, descId[1].id) for descId in descIds]
-        # set values for params
-        for paramId, value in zip(paramIds, values):
-            cobject.obj[paramId] = value
-
-    def get_value(self, cobject, descId):
-        # gets the value for the corresponding descId for given cobject
-
-        # turn descId into paramId
-        paramId = (descId[0].id, descId[1].id)
-        # read out value
-        value = cobject.obj[paramId]
-
-        return value
 
     def set_time(self, time):
         if type(time) is float or type(time) is int:
@@ -166,54 +88,152 @@ class Scene():
             c4d.EventAdd()
             self.kairos.append(cobject)
 
+    @staticmethod
+    def get_curve(cobject, descId):
+        # returns the corresponding curve of the descId
+        track = cobject.obj.FindCTrack(descId)
+        if track is None:
+            track = c4d.CTrack(cobject.obj, descId)
+            # insert ctrack into objects timeline
+            cobject.obj.InsertTrackSorted(track)
+
+        curve = track.GetCurve()
+
+        return curve
+
+    def make_keyframes(self, cobject, descIds):
+        # utility function for making keyframing less cluttered
+
+        # get curves from descIds
+        curves = [self.get_curve(cobject, descId) for descId in descIds]
+        values = [self.get_value(cobject, descId) for descId in descIds]
+        # add keys and set values
+        for curve, value in zip(curves, values):
+            key = curve.AddKey(self.get_time())["key"]
+            if type(value) == int:
+                key.SetGeData(curve, value)
+            elif type(value) == float:
+                key.SetValue(curve, value)
+            else:
+                raise TypeError("value type must be int or float")
+
+        c4d.EventAdd()
+
+    def set_values(self, cobject, descIds, values, isrelative):
+        # sets the values for the corresponding descIds for given cobject
+
+        # turn descId into paramId
+        for descId in descIds:
+            if len(descId) == 1:
+                paramIds = [descId[0].id for descId in descIds]
+            elif len(descId) == 2:
+                paramIds = [(descId[0].id, descId[1].id) for descId in descIds]
+            elif len(descId) == 3:
+                paramIds = [(descId[0].id, descId[1].id, descId[2].id)
+                            for descId in descIds]
+
+        if isrelative:
+            for paramId, relative_value in zip(paramIds, values):
+                # get current value for param
+                current_value = cobject.obj[paramId]
+                # calculate relative value for param
+                # checks for multiplicative vs additive params
+                if paramId[0] == c4d.ID_BASEOBJECT_SCALE:
+                    value = current_value * relative_value
+                else:
+                    value = current_value + relative_value
+                # set value for param
+                cobject.obj[paramId] = value
+        else:
+            # set values for params
+            for paramId, value in zip(paramIds, values):
+                cobject.obj[paramId] = value
+
+    def get_value(self, cobject, descId):
+        # gets the value for the corresponding descId for given cobject
+
+        # turn descId into paramId
+        if len(descId) == 1:
+            paramId = descId[0].id
+        elif len(descId) == 2:
+            paramId = (descId[0].id, descId[1].id)
+        elif len(descId) == 3:
+            paramId = (descId[0].id, descId[1].id, descId[2].id)
+        # read out value
+        value = cobject.obj[paramId]
+
+        return value
+
     def wait(self, time=1):
         self.add_time(time)
 
     def add(self, *cobjects):
         # inserts cobjects into scene at given point in time
 
+        desc_vis_editor = c4d.DescID(c4d.DescLevel(
+            c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
+        desc_vis_render = c4d.DescID(c4d.DescLevel(
+            c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+
+        descIds = [desc_vis_editor, desc_vis_render]
+
+        values = [c4d.MODE_ON, c4d.MODE_ON]
+
         for cobject in cobjects:
+
+            self.set_values(cobject, descIds, values, isrelative=False)
 
             self.check_kairos(cobject)
 
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_ON, time=self.time)
+            self.make_keyframes(cobject, descIds)
 
-            # add cobjects to live cobjects
+            # add cobjects to chronos
             self.chronos.append(cobject)
 
     def remove(self, *cobjects):
-        # removes cobjects from scene at given point in time
+        # inserts cobjects into scene at given point in time
+
+        desc_vis_editor = c4d.DescID(c4d.DescLevel(
+            c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
+        desc_vis_render = c4d.DescID(c4d.DescLevel(
+            c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+
+        descIds = [desc_vis_editor, desc_vis_render]
+
+        values = [c4d.MODE_OFF, c4d.MODE_OFF]
 
         for cobject in cobjects:
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
 
-            # remove cobjects from live cobjects
+            self.set_values(cobject, descIds, values, isrelative=False)
+
+            self.check_kairos(cobject)
+
+            self.make_keyframes(cobject, descIds)
+
+            # add cobjects to chronos
             self.chronos.remove(cobject)
 
     def clear(self):
         # removes all cobjects from scene at given point in time
-        for cobject in self.chronos:
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_EDITOR,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
-            self.make_keyframe(cobject.obj, t_ids=c4d.ID_BASEOBJECT_VISIBILITY_RENDER,
-                               dtypes=c4d.DTYPE_LONG, value=c4d.MODE_OFF, time=self.time)
+        self.remove(*self.chronos)
 
-        # remove cobjects from live cobjects
+        # remove cobjects from chronos
         self.chronos.clear()
 
-    def play(self, cobject, values, descIds, run_time=1):
+    def play(self, cobject, values, descIds, isrelative, run_time=1):
         # plays animation of cobject
 
         # keyframe current state
         self.make_keyframes(cobject, descIds)
         # add run_time
         self.add_time(run_time)
-        self.set_values(cobject, descIds, values)
+        # set the values for corresponding params
+        self.set_values(cobject, descIds, values, isrelative)
         # keyframe desired state
         self.make_keyframes(cobject, descIds)
+
+    def set(self, cobject, values, descIds, isrelative):
+        # sets object to end state of animation without playing it
+
+        # set the values for corresponding params
+        self.set_values(cobject, descIds, values, isrelative)
