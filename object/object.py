@@ -8,6 +8,30 @@ TODO: find way for not having to pass doc
 class CObject():
     """abstract class for adding objects to scene"""
 
+    # universal descIds
+    descIds = {
+        "pos": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0)),
+        "pos_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+        "pos_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+        "pos_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+        "rot": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0)),
+        "rot_h": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+        "rot_p": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+        "rot_b": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+        "scale": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0)),
+        "scale_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
+                              c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+        "scale_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
+                              c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+        "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
+                              c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0))
+    }
     def __init__(self):
 
         # check if primitive type changed by child class
@@ -16,50 +40,25 @@ class CObject():
         else:
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
 
-        # universal descIds
-        self.descIds = {
-            "pos": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0)),
-            "pos_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
-            "pos_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
-            "pos_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
-            "rot": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0)),
-            "rot_h": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
-            "rot_p": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
-            "rot_b": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
-                                c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
-            "scale": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0)),
-            "scale_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
-                                  c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
-            "scale_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
-                                  c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
-            "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
-                                  c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0))
-        }
-
-    def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, isrelative=False):
+    def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False):
         # transforms the objects position, rotation, scale
         descIds = [
-            self.descIds["pos_x"],
-            self.descIds["pos_y"],
-            self.descIds["pos_z"],
-            self.descIds["rot_h"],
-            self.descIds["rot_p"],
-            self.descIds["rot_b"],
-            self.descIds["scale_x"],
-            self.descIds["scale_y"],
-            self.descIds["scale_z"]
+            CObject.descIds["pos_x"],
+            CObject.descIds["pos_y"],
+            CObject.descIds["pos_z"],
+            CObject.descIds["rot_h"],
+            CObject.descIds["rot_p"],
+            CObject.descIds["rot_b"],
+            CObject.descIds["scale_x"],
+            CObject.descIds["scale_y"],
+            CObject.descIds["scale_z"]
         ]
 
         values = [float(x), float(y), float(z),
                   float(h), float(p), float(b),
                   float(scale), float(scale), float(scale)]
 
-        return self, values, descIds, isrelative
+        return (self, values, descIds, absolute)
 
 
 class Sphere(CObject):
@@ -92,3 +91,22 @@ class Cylinder(CObject):
     def __init__(self):
         self.prim = c4d.Ocylinder
         super(Cylinder, self).__init__()
+
+
+class Group(CObject):
+
+    def __init__(self, *cobjects):
+
+        # create parent null
+        self.obj = c4d.BaseObject(c4d.Onull)
+        self.obj.SetName("Group")
+        self.children = []
+
+        # add cobjects as children
+        for cobject in cobjects:
+            self.children.append(cobject)
+            cobject.obj.InsertUnder(self.obj)
+
+        self.obj[c4d.ID_BASEOBJECT_POSITION, c4d.VECTOR_Y] = -200
+
+        print(self.obj[c4d.ID_BASEOBJECT_POSITION])

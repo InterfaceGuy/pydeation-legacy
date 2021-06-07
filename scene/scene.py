@@ -119,7 +119,7 @@ class Scene():
 
         c4d.EventAdd()
 
-    def set_values(self, cobject, descIds, values, isrelative):
+    def set_values(self, cobject, descIds, values, absolute):
         # sets the values for the corresponding descIds for given cobject
 
         # turn descId into paramId
@@ -132,7 +132,11 @@ class Scene():
                 paramIds = [(descId[0].id, descId[1].id, descId[2].id)
                             for descId in descIds]
 
-        if isrelative:
+        if absolute:
+            # set values for params
+            for paramId, value in zip(paramIds, values):
+                cobject.obj[paramId] = value
+        else:
             for paramId, relative_value in zip(paramIds, values):
                 # get current value for param
                 current_value = cobject.obj[paramId]
@@ -143,10 +147,6 @@ class Scene():
                 else:
                     value = current_value + relative_value
                 # set value for param
-                cobject.obj[paramId] = value
-        else:
-            # set values for params
-            for paramId, value in zip(paramIds, values):
                 cobject.obj[paramId] = value
 
     def get_value(self, cobject, descId):
@@ -181,7 +181,7 @@ class Scene():
 
         for cobject in cobjects:
 
-            self.set_values(cobject, descIds, values, isrelative=False)
+            self.set_values(cobject, descIds, values, absolute=True)
 
             self.check_kairos(cobject)
 
@@ -204,7 +204,7 @@ class Scene():
 
         for cobject in cobjects:
 
-            self.set_values(cobject, descIds, values, isrelative=False)
+            self.set_values(cobject, descIds, values, absolute=True)
 
             self.check_kairos(cobject)
 
@@ -220,20 +220,36 @@ class Scene():
         # remove cobjects from chronos
         self.chronos.clear()
 
-    def play(self, cobject, values, descIds, isrelative, run_time=1):
-        # plays animation of cobject
+    def play(self, *animations, run_time=1):
+        # plays animations of cobjects
 
-        # keyframe current state
-        self.make_keyframes(cobject, descIds)
+        # set initial keyframes
+        # unpack individual animations
+        for animation in animations:
+            # unpack data from animation
+            cobject, values, descIds, absolute = animation
+            # keyframe current state
+            self.make_keyframes(cobject, descIds)
+
         # add run_time
         self.add_time(run_time)
-        # set the values for corresponding params
-        self.set_values(cobject, descIds, values, isrelative)
-        # keyframe desired state
-        self.make_keyframes(cobject, descIds)
 
-    def set(self, cobject, values, descIds, isrelative):
+        # set final keyframes
+        # unpack individual animations
+        for animation in animations:
+            # unpack data from animation
+            cobject, values, descIds, absolute = animation
+            # set the values for corresponding params
+            self.set_values(cobject, descIds, values, absolute)
+            # keyframe desired state
+            self.make_keyframes(cobject, descIds)
+
+    def set(self, *transformations):
         # sets object to end state of animation without playing it
 
-        # set the values for corresponding params
-        self.set_values(cobject, descIds, values, isrelative)
+        # unpack individual transformations
+        for transformation in transformations:
+            # unpack data from transformation
+            cobject, values, descIds, absolute = transformation
+            # set the values for corresponding params
+            self.set_values(cobject, descIds, values, absolute)
