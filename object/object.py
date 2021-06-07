@@ -105,8 +105,3 @@ class Group(CObject):
         # add cobjects as children
         for cobject in cobjects:
             self.children.append(cobject)
-            cobject.obj.InsertUnder(self.obj)
-
-        self.obj[c4d.ID_BASEOBJECT_POSITION, c4d.VECTOR_Y] = -200
-
-        print(self.obj[c4d.ID_BASEOBJECT_POSITION])

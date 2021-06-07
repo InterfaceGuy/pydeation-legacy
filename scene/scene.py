@@ -78,13 +78,22 @@ class Scene():
         time_fin = time_ini + c4d.BaseTime(run_time)
         self.set_time(time_fin)
 
-    def check_kairos(self, cobject):
+    def add_to_kairos(self, cobject):
         # checks whether object is in kairos and if not adds it
         if (cobject in self.kairos):
             pass
         else:
             # add object to kairos
             self.doc.InsertObject(cobject.obj)
+            # set to hidden at frame zero
+            desc_vis_editor = c4d.DescID(c4d.DescLevel(
+                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
+            desc_vis_render = c4d.DescID(c4d.DescLevel(
+                c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+            descIds = [desc_vis_editor, desc_vis_render]
+            values = [c4d.MODE_OFF, c4d.MODE_OFF]
+            self.set_values(cobject, descIds, values, absolute=True)
+            self.make_keyframes(cobject, descIds, time=0)
             c4d.EventAdd()
             self.kairos.append(cobject)
 
@@ -101,7 +110,7 @@ class Scene():
 
         return curve
 
-    def make_keyframes(self, cobject, descIds):
+    def make_keyframes(self, cobject, descIds, time=None):
         # utility function for making keyframing less cluttered
 
         # get curves from descIds
@@ -109,7 +118,10 @@ class Scene():
         values = [self.get_value(cobject, descId) for descId in descIds]
         # add keys and set values
         for curve, value in zip(curves, values):
-            key = curve.AddKey(self.get_time())["key"]
+            if time is None:
+                key = curve.AddKey(self.get_time())["key"]
+            else:
+                key = curve.AddKey(c4d.BaseTime(time))["key"]
             if type(value) == int:
                 key.SetGeData(curve, value)
             elif type(value) == float:
@@ -180,13 +192,26 @@ class Scene():
         values = [c4d.MODE_ON, c4d.MODE_ON]
 
         for cobject in cobjects:
-
+            # check whether cobject is group
+            if hasattr(cobject, "children"):
+                # add children to scene
+                for child in cobject.children:
+                    # add child to kairos
+                    self.add_to_kairos(child)
+                    # set visibility
+                    self.set_values(child, descIds, values, absolute=True)
+                    # insert child under group
+                    child.obj.InsertUnder(cobject.obj)
+                    # keyframe visibility
+                    self.make_keyframes(child, descIds)
+                    # add children to chronos
+                    self.chronos.append(child)
+            # add cobject to kairos
+            self.add_to_kairos(cobject)
+            # set visibility
             self.set_values(cobject, descIds, values, absolute=True)
-
-            self.check_kairos(cobject)
-
+            # keyfrme visibility
             self.make_keyframes(cobject, descIds)
-
             # add cobjects to chronos
             self.chronos.append(cobject)
 
@@ -203,15 +228,24 @@ class Scene():
         values = [c4d.MODE_OFF, c4d.MODE_OFF]
 
         for cobject in cobjects:
-
+            # check whether cobject is group
+            if hasattr(cobject, "children"):
+                # add children to scene
+                for child in cobject.children:
+                    # set visibility
+                    self.set_values(child, descIds, values, absolute=True)
+                    # insert child under group
+                    child.obj.InsertUnder(cobject.obj)
+                    # keyframe visibility
+                    self.make_keyframes(child, descIds)
+                    # add children to chronos
+                    self.chronos.append(child)
+            # set visibility
             self.set_values(cobject, descIds, values, absolute=True)
-
-            self.check_kairos(cobject)
-
+            # keyfrme visibility
             self.make_keyframes(cobject, descIds)
-
             # add cobjects to chronos
-            self.chronos.remove(cobject)
+            self.chronos.append(cobject)
 
     def clear(self):
         # removes all cobjects from scene at given point in time
@@ -226,10 +260,21 @@ class Scene():
         # set initial keyframes
         # unpack individual animations
         for animation in animations:
-            # unpack data from animation
-            cobject, values, descIds, absolute = animation
-            # keyframe current state
-            self.make_keyframes(cobject, descIds)
+            # check for animation group
+            if type(animation) is list:
+                # rename as animation group
+                animation_group = animation
+                # unpack individual animations
+                for animation in animation_group:
+                    # unpack data from animations
+                    cobject, values, descIds, absolute = animation
+                    # keyframe current state
+                    self.make_keyframes(cobject, descIds)
+            elif type(animation) is tuple:
+                # unpack data from animation
+                cobject, values, descIds, absolute = animation
+                # keyframe current state
+                self.make_keyframes(cobject, descIds)
 
         # add run_time
         self.add_time(run_time)
@@ -237,12 +282,25 @@ class Scene():
         # set final keyframes
         # unpack individual animations
         for animation in animations:
-            # unpack data from animation
-            cobject, values, descIds, absolute = animation
-            # set the values for corresponding params
-            self.set_values(cobject, descIds, values, absolute)
-            # keyframe desired state
-            self.make_keyframes(cobject, descIds)
+            # check for animation group
+            if type(animation) is list:
+                # rename as animation group
+                animation_group = animation
+                # unpack individual animations
+                for animation in animation_group:
+                    # unpack data from animations
+                    cobject, values, descIds, absolute = animation
+                    # set the values for corresponding params
+                    self.set_values(cobject, descIds, values, absolute)
+                    # keyframe current state
+                    self.make_keyframes(cobject, descIds)
+            elif type(animation) is tuple:
+                # unpack data from animation
+                cobject, values, descIds, absolute = animation
+                # set the values for corresponding params
+                self.set_values(cobject, descIds, values, absolute)
+                # keyframe current state
+                self.make_keyframes(cobject, descIds)
 
     def set(self, *transformations):
         # sets object to end state of animation without playing it
