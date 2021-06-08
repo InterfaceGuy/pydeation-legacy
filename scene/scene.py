@@ -137,11 +137,12 @@ class Scene():
         # turn descId into paramId
         for descId in descIds:
             if len(descId) == 1:
-                paramIds = [descId[0].id for descId in descIds]
+                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
+                paramIds = [[descId[0].id] for descId in descIds]
             elif len(descId) == 2:
-                paramIds = [(descId[0].id, descId[1].id) for descId in descIds]
+                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
             elif len(descId) == 3:
-                paramIds = [(descId[0].id, descId[1].id, descId[2].id)
+                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
                             for descId in descIds]
 
         if absolute:
@@ -179,7 +180,7 @@ class Scene():
     def wait(self, time=1):
         self.add_time(time)
 
-    def add(self, *cobjects):
+    def show(self, *cobjects):
         # inserts cobjects into scene at given point in time
 
         desc_vis_editor = c4d.DescID(c4d.DescLevel(
@@ -215,7 +216,7 @@ class Scene():
             # add cobjects to chronos
             self.chronos.append(cobject)
 
-    def remove(self, *cobjects):
+    def hide(self, *cobjects):
         # inserts cobjects into scene at given point in time
 
         desc_vis_editor = c4d.DescID(c4d.DescLevel(
@@ -249,7 +250,7 @@ class Scene():
 
     def clear(self):
         # removes all cobjects from scene at given point in time
-        self.remove(*self.chronos)
+        self.hide(*self.chronos)
 
         # remove cobjects from chronos
         self.chronos.clear()
@@ -305,9 +306,5 @@ class Scene():
     def set(self, *transformations):
         # sets object to end state of animation without playing it
 
-        # unpack individual transformations
-        for transformation in transformations:
-            # unpack data from transformation
-            cobject, values, descIds, absolute = transformation
-            # set the values for corresponding params
-            self.set_values(cobject, descIds, values, absolute)
+        fps = self.doc.GetFps()
+        self.play(*transformations, run_time=1 / fps)

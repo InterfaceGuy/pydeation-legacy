@@ -34,11 +34,10 @@ class CObject():
     }
     def __init__(self):
 
-        # check if primitive type changed by child class
-        if hasattr(self, "prim"):
-            self.obj = c4d.BaseObject(self.prim)
-        else:
+        if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
+
+        # set universal default params
 
     def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False):
         # transforms the objects position, rotation, scale
@@ -60,40 +59,155 @@ class CObject():
 
         return (self, values, descIds, absolute)
 
+class SplineObject(CObject):
+
+    planes = {
+        "XY": 0,
+        "ZY": 1,
+        "XZ": 2
+    }
+
+    # descIds
+    descIds = {
+        "plane": c4d.DescID(c4d.DescLevel(c4d.PRIM_PLANE, c4d.DTYPE_LONG, 0))
+    }
+
+    def __init__(self):
+        self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
+        super(SplineObject, self).__init__()
+
+class Rectangle(SplineObject):
+
+    def __init__(self):
+        # create object
+        self.obj = c4d.BaseObject(c4d.Osplinerectangle)
+        # set ideosynchratic default params
+        self.obj[c4d.PRIM_RECTANGLE_ROUNDING] = True
+        self.obj[c4d.PRIM_RECTANGLE_RADIUS] = 0
+        # run universal initialisation
+        super(Rectangle, self).__init__()
+
+    def params(self, width=400, height=400, rounding=0, plane="XZ"):
+
+        # limit rounding to 0-1 range
+        if rounding < 0 or rounding > 1:
+            raise ValueError("rounding value must be between 0-1!")
+
+        # calculate values
+        # radius
+        curr_width = self.obj[c4d.PRIM_RECTANGLE_WIDTH]
+        curr_height = self.obj[c4d.PRIM_RECTANGLE_HEIGHT]
+        radius = min(curr_width, curr_height) / 2 * rounding
+        # plane
+        plane = SplineObject.planes[plane]
+
+        # gather animation data
+        desc_radius = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_RECTANGLE_RADIUS, c4d.DTYPE_REAL, 0))
+        desc_width = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_RECTANGLE_WIDTH, c4d.DTYPE_REAL, 0))
+        desc_height = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_RECTANGLE_HEIGHT, c4d.DTYPE_REAL, 0))
+        desc_plane = SplineObject.descIds["plane"]
+
+        descIds = [desc_radius, desc_width, desc_height, desc_plane]
+
+        values = [float(radius), float(width), float(height), int(plane)]
+
+        return (self, values, descIds, True)
+
+class Circle(SplineObject):
+
+    RADIUS_X = 200
+    RADIUS_Y = 200
+
+    def __init__(self):
+        # create object
+        self.obj = c4d.BaseObject(c4d.Osplinecircle)
+        # set ideosynchratic default params
+        self.obj[c4d.PRIM_CIRCLE_ELLIPSE] = True
+        self.obj[c4d.PRIM_CIRCLE_RING] = True
+        self.obj[c4d.PRIM_CIRCLE_INNER] = self.obj[c4d.PRIM_CIRCLE_RADIUS]
+        # run universal initialisation
+        super(Circle, self).__init__()
+
+    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
+
+        # limit ratios to 0-1 range
+        if ellipse_ratio < 0 or ellipse_ratio > 1:
+            raise ValueError("ellipse ratio value must be between 0-1!")
+        if ring_ratio < 0 or ring_ratio > 1:
+            raise ValueError("ring ratio value must be between 0-1!")
+
+        # calculate values
+        # radii
+        radius_x = Circle.RADIUS_X
+        radius_y = Circle.RADIUS_Y
+        # radius y
+        if ellipse_axis == "HORIZONTAL":
+            radius_y = Circle.RADIUS_X * ellipse_ratio
+        # radius x
+        elif ellipse_axis == "VERTICAL":
+            radius_x = Circle.RADIUS_Y * ellipse_ratio
+        # inner radius
+        inner_radius = radius_x * ring_ratio
+        # plane
+        plane = SplineObject.planes[plane]
+
+        # gather animation data
+        desc_radius_x = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_CIRCLE_RADIUS, c4d.DTYPE_REAL, 0))
+        desc_radius_y = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_CIRCLE_RADIUSY, c4d.DTYPE_REAL, 0))
+        desc_inner_radius = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_CIRCLE_INNER, c4d.DTYPE_REAL, 0))
+        desc_plane = SplineObject.descIds["plane"]
+
+        descIds = [desc_radius_x, desc_radius_y, desc_inner_radius, desc_plane]
+
+        values = [float(radius_x), float(radius_y),
+                  float(inner_radius), int(plane)]
+
+        return (self, values, descIds, True)
+
 
 class Sphere(CObject):
 
     def __init__(self):
-        self.prim = c4d.Osphere
+        # create object
+        self.obj = c4d.BaseObject(c4d.Osphere)
+        # set ideosynchratic default params
+
+        # run universal initialisation
         super(Sphere, self).__init__()
 
 
 class Cube(CObject):
 
     def __init__(self):
-        self.prim = c4d.Ocube
+        # create object
+        self.obj = c4d.BaseObject(c4d.Ocube)
+        # set ideosynchratic default params
+
+        # run universal initialisation
         super(Cube, self).__init__()
 
-class Circle(CObject):
-
-    def __init__(self):
-        self.prim = c4d.Osplinecircle
-        super(Circle, self).__init__()
-
-class Rectangle(CObject):
-
-    def __init__(self):
-        self.prim = c4d.Osplinerectangle
-        super(Rectangle, self).__init__()
 
 class Cylinder(CObject):
 
     def __init__(self):
-        self.prim = c4d.Ocylinder
+        # create object
+        self.obj = c4d.BaseObject(c4d.Ocylinder)
+        # set ideosynchratic default params
+
+        # run universal initialisation
         super(Cylinder, self).__init__()
 
 
 class Group(CObject):
+    """
+    creates null and adds cobjects as children
+    """
 
     def __init__(self, *cobjects):
 

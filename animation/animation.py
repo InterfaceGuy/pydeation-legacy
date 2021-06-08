@@ -5,11 +5,10 @@ class Animation():
     """
     name = "transform"
 
-    def __new__(cls, *cobjects, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False):
+    def __new__(cls, *cobjects, **params):
         animations = []
         for cobject in cobjects:
-            animation = getattr(cobject, Animation.name)(
-                x, y, z, h, p, b, scale, absolute)
+            animation = getattr(cobject, Animation.name)(**params)
             animations.append(animation)
 
         return animations
