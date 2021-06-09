@@ -1,8 +1,7 @@
 import c4d
-from pydeationlib.scene.scene import Scene
-"""
-TODO: find way for not having to pass doc
-"""
+
+c4d.Msketch = 1011014  # add missing descriptor for sketch material
+c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
 
 
 class CObject():
@@ -36,6 +35,13 @@ class CObject():
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
+
+        # create filler material
+        self.filler_mat = c4d.BaseMaterial(c4d.Mmaterial)  # filler material
+        # create tag
+        self.filler_tag = c4d.BaseTag(c4d.Ttexture)  # filler tag
+        # assign material to tag
+        self.filler_tag.SetMaterial(self.filler_mat)
 
         # set universal default params
 
@@ -74,6 +80,8 @@ class SplineObject(CObject):
 
     def __init__(self):
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
+        self.parent = c4d.BaseObject(c4d.Oloft)
+        self.parent.SetName(self.obj.GetName())
         super(SplineObject, self).__init__()
 
 class Rectangle(SplineObject):

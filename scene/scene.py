@@ -85,6 +85,20 @@ class Scene():
         else:
             # add object to kairos
             self.doc.InsertObject(cobject.obj)
+            # add object's materials to kairos
+            self.doc.InsertMaterial(cobject.filler_mat)
+            cobject.obj.InsertTag(cobject.filler_tag)
+
+            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
+            self.doc.SetActiveObject(cobject.obj)
+            c4d.CallCommand(1011012)
+            c4d.CallCommand(100004788, 50038)  # New Tag
+            cobject.sketch_tag = self.doc.GetActiveTag()
+            cobject.sketch_mat = self.doc.GetFirstMaterial()
+
+            if hasattr(cobject, "parent"):
+                self.doc.InsertObject(cobject.parent)
+                cobject.obj.InsertUnder(cobject.parent)
             # set to hidden at frame zero
             desc_vis_editor = c4d.DescID(c4d.DescLevel(
                 c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
