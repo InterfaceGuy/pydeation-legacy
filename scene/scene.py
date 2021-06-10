@@ -1,8 +1,11 @@
 
 from pydeationlib.constants import *
 import os
-from c4d.documents import *
+import c4d.documents as c4doc
 import c4d
+
+
+c4d.VPsketch = 1011015  # add missing descriptor for sketch render settings
 
 
 class Scene():
@@ -13,41 +16,93 @@ class Scene():
     """
 
     def __init__(self, project_name):
-        # following code obsolete but kept as reference for future efforts
-        """
-        path = os.path.dirname(os.path.abspath(__file__))
-        head, tail = os.path.split(path)
-        print(tail)
-        """
+
+        # file related actions
         # read in project name
         self.project_name = project_name
         # use subclass name for scene's name for saving c4d project file
         self.scene_name = self.__class__.__name__
-        self.doc = BaseDocument()
+        self.doc = c4doc.BaseDocument()
         # this gives us the path of the project to store our individual scene files in
         self.project_path = os.path.join(PROJECTS_PATH, self.project_name)
         self.scene_path = os.path.join(
             PROJECTS_PATH, self.project_name, self.scene_name)
-
         # create folder with scene's name
         try:  # check if folder already exists
             os.mkdir(self.scene_path)
             print("path successfully created")
         except FileExistsError:
             pass
-        #    print("path already exists")
-        except PermissionError:
-            print("permission denied")
-        # except FileNotFoundError:
-        #   print("wrong tail: " + tail)
 
+        # document related actions
+        # name document after scene
         self.doc.SetDocumentName(self.scene_name)
-        InsertBaseDocument(self.doc)  # insert document in menu list
+        # insert document in menu list
+        c4doc.InsertBaseDocument(self.doc)
+        # render settings
+        # get render data
+        render_data = self.doc.GetActiveRenderData()
+        # create sketch setting
+        sketch_vp = c4doc.BaseVideoPost(c4d.VPsketch)
+        # insert sketch setting
+        render_data.InsertVideoPost(sketch_vp)
+        # set sketch params
+        sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
+        sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
+        sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
 
         # scene-wide attributes
         self.time = 0
         self.kairos = []
         self.chronos = []
+
+    def add_to_kairos(self, cobject):
+        # checks whether object is in kairos and if not adds it
+        if (cobject in self.kairos):
+            pass
+        else:
+
+            # add object to kairos
+            self.doc.InsertObject(cobject.obj)
+
+            # add object's materials to kairos
+            self.doc.InsertMaterial(cobject.filler_mat)
+            # check for spline object
+            if hasattr(cobject, "parent"):
+                # add parent to kairos
+                self.doc.InsertObject(cobject.parent)
+                # make cobject child of parent
+                cobject.obj.InsertUnder(cobject.parent)
+                # apply filler material to parent
+                cobject.parent.InsertTag(cobject.filler_tag)
+                # select cobject for sketch material workaround
+                self.doc.SetActiveObject(cobject.parent)
+
+            else:
+                # apply filler material to cobject
+                cobject.obj.InsertTag(cobject.filler_tag)
+                # select cobject for sketch material workaround
+                self.doc.SetActiveObject(cobject.obj)
+
+            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
+            c4d.CallCommand(1011012)
+            c4d.CallCommand(100004788, 50038)  # New Tag
+            cobject.sketch_tag = self.doc.GetActiveTag()
+            cobject.sketch_mat = self.doc.GetFirstMaterial()
+            # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
+            cobject.set_sketch_mat(color=cobject.color)
+
+            # set to hidden at frame zero
+            desc_vis_editor = c4d.DescID(c4d.DescLevel(
+                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
+            desc_vis_render = c4d.DescID(c4d.DescLevel(
+                c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+            descIds = [desc_vis_editor, desc_vis_render]
+            values = [c4d.MODE_OFF, c4d.MODE_OFF]
+            self.set_values(cobject, descIds, values, absolute=True)
+            self.make_keyframes(cobject, descIds, time=0)
+            c4d.EventAdd()
+            self.kairos.append(cobject)
 
     def finish(self):
         # set maximum time to time after last animation
@@ -55,8 +110,8 @@ class Scene():
         # set time to frame 0
         self.set_time(0)
         # save the scene to project file
-        SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
-                    c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
+        c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
+                          c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
         c4d.EventAdd()
 
     def get_frame(self):
@@ -77,39 +132,6 @@ class Scene():
         time_ini = self.get_time()
         time_fin = time_ini + c4d.BaseTime(run_time)
         self.set_time(time_fin)
-
-    def add_to_kairos(self, cobject):
-        # checks whether object is in kairos and if not adds it
-        if (cobject in self.kairos):
-            pass
-        else:
-            # add object to kairos
-            self.doc.InsertObject(cobject.obj)
-            # add object's materials to kairos
-            self.doc.InsertMaterial(cobject.filler_mat)
-            cobject.obj.InsertTag(cobject.filler_tag)
-
-            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
-            self.doc.SetActiveObject(cobject.obj)
-            c4d.CallCommand(1011012)
-            c4d.CallCommand(100004788, 50038)  # New Tag
-            cobject.sketch_tag = self.doc.GetActiveTag()
-            cobject.sketch_mat = self.doc.GetFirstMaterial()
-
-            if hasattr(cobject, "parent"):
-                self.doc.InsertObject(cobject.parent)
-                cobject.obj.InsertUnder(cobject.parent)
-            # set to hidden at frame zero
-            desc_vis_editor = c4d.DescID(c4d.DescLevel(
-                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-            desc_vis_render = c4d.DescID(c4d.DescLevel(
-                c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
-            descIds = [desc_vis_editor, desc_vis_render]
-            values = [c4d.MODE_OFF, c4d.MODE_OFF]
-            self.set_values(cobject, descIds, values, absolute=True)
-            self.make_keyframes(cobject, descIds, time=0)
-            c4d.EventAdd()
-            self.kairos.append(cobject)
 
     @staticmethod
     def get_curve(cobject, descId):

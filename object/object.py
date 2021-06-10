@@ -1,8 +1,11 @@
 import c4d
+from pydeationlib.constants import *
 
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
 
+
+# TO DO: find proper solution for sketch material!
 
 class CObject():
     """abstract class for adding objects to scene"""
@@ -31,7 +34,7 @@ class CObject():
         "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0))
     }
-    def __init__(self):
+    def __init__(self, color=BLUE):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -44,6 +47,29 @@ class CObject():
         self.filler_tag.SetMaterial(self.filler_mat)
 
         # set universal default params
+        self.color = color
+        self.set_filler_mat(color=self.color)
+        # because of workaround set_sketch_mat() is called in add_to_kairos()
+
+    def set_filler_mat(self, color=BLUE):
+        # sets params of filler mat as a function of color
+
+        self.filler_mat[c4d.MATERIAL_USE_COLOR] = False
+        self.filler_mat[c4d.MATERIAL_USE_LUMINANCE] = True
+        self.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR] = color
+        self.filler_mat[c4d.MATERIAL_USE_TRANSPARENCY] = True
+        self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 0.9
+        self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
+        self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
+
+    def set_sketch_mat(self, color=BLUE):
+        # sets params of filler mat as a function of color
+
+        self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
+        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = 3
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = True
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
 
     def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False):
         # transforms the objects position, rotation, scale
@@ -64,6 +90,7 @@ class CObject():
                   float(scale), float(scale), float(scale)]
 
         return (self, values, descIds, absolute)
+
 
 class SplineObject(CObject):
 
@@ -203,13 +230,17 @@ class Cube(CObject):
 
 class Cylinder(CObject):
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         # create object
         self.obj = c4d.BaseObject(c4d.Ocylinder)
+
         # set ideosynchratic default params
+        self.obj[c4d.PRIM_CYLINDER_SEG] = 64
+        self.obj[c4d.PRIM_CYLINDER_HSUB] = 1
+        self.obj[c4d.PRIM_AXIS] = 4
 
         # run universal initialisation
-        super(Cylinder, self).__init__()
+        super(Cylinder, self).__init__(color=color)
 
 
 class Group(CObject):
