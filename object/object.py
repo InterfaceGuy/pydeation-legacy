@@ -32,7 +32,9 @@ class CObject():
         "scale_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
         "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
-                              c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0))
+                              c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+        "draw_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
+        "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0))
     }
     def __init__(self, color=BLUE):
 
@@ -58,7 +60,7 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_USE_LUMINANCE] = True
         self.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR] = color
         self.filler_mat[c4d.MATERIAL_USE_TRANSPARENCY] = True
-        self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 0.9
+        self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
@@ -67,11 +69,15 @@ class CObject():
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
         self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = 3
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
+        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_AUTODRAW] = True
+        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
+        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
 
-    def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False):
+    def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False, rel_delay=0):
         # transforms the objects position, rotation, scale
         descIds = [
             CObject.descIds["pos_x"],
@@ -89,7 +95,38 @@ class CObject():
                   float(h), float(p), float(b),
                   float(scale), float(scale), float(scale)]
 
-        return (self, values, descIds, absolute)
+        animation_params = [absolute, rel_delay]
+
+        return (self, values, descIds, animation_params)
+
+    def draw(self, rel_delay=0):
+        # draw contours
+
+        descIds = [CObject.descIds["draw_completion"]]
+        values = [1.0]
+        animation_params = [True, rel_delay]
+
+        return (self.sketch_mat, values, descIds, animation_params)
+
+    def fill(self, transparency=FILLER_TRANSPARENCY, solid=False, rel_delay=0):
+        # shifts transparency of filler material
+
+        # check solid param
+        if solid:
+            transparency = 0
+
+        descIds = [CObject.descIds["filler_transparency"]]
+        values = [transparency]
+        animation_params = [True, rel_delay]
+
+        return (self.filler_mat, values, descIds, animation_params)
+
+    def draw_then_fill(self):
+
+        draw_animation = self.draw()
+        fill_animation = self.fill(rel_delay=0.5)
+
+        return [draw_animation, fill_animation]
 
 
 class SplineObject(CObject):
@@ -122,7 +159,7 @@ class Rectangle(SplineObject):
         # run universal initialisation
         super(Rectangle, self).__init__()
 
-    def params(self, width=400, height=400, rounding=0, plane="XZ"):
+    def params(self, width=400, height=400, rounding=0, plane="XZ", rel_delay=0):
 
         # limit rounding to 0-1 range
         if rounding < 0 or rounding > 1:
@@ -149,7 +186,9 @@ class Rectangle(SplineObject):
 
         values = [float(radius), float(width), float(height), int(plane)]
 
-        return (self, values, descIds, True)
+        animation_params = [True, rel_delay]
+
+        return (self, values, descIds, animation_params)
 
 class Circle(SplineObject):
 
@@ -166,7 +205,7 @@ class Circle(SplineObject):
         # run universal initialisation
         super(Circle, self).__init__()
 
-    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
+    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ", rel_delay=0):
 
         # limit ratios to 0-1 range
         if ellipse_ratio < 0 or ellipse_ratio > 1:
@@ -203,8 +242,9 @@ class Circle(SplineObject):
         values = [float(radius_x), float(radius_y),
                   float(inner_radius), int(plane)]
 
-        return (self, values, descIds, True)
+        animation_params = [True, rel_delay]
 
+        return (self, values, descIds, animation_params)
 
 class Sphere(CObject):
 

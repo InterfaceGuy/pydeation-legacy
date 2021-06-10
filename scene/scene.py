@@ -4,7 +4,6 @@ import os
 import c4d.documents as c4doc
 import c4d
 
-
 c4d.VPsketch = 1011015  # add missing descriptor for sketch render settings
 
 
@@ -50,6 +49,9 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
         sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
+        # set general render params
+        render_data[c4d.RDATA_FRAMESEQUENCE] = 3
+        render_data[c4d.RDATA_SAVEIMAGE] = False
 
         # scene-wide attributes
         self.time = 0
@@ -136,18 +138,29 @@ class Scene():
     @staticmethod
     def get_curve(cobject, descId):
         # returns the corresponding curve of the descId
-        track = cobject.obj.FindCTrack(descId)
+
+        # check whether cobject or material
+        if hasattr(cobject, "obj"):
+            obj = cobject.obj
+        else:
+            obj = cobject
+
+        track = obj.FindCTrack(descId)
         if track is None:
-            track = c4d.CTrack(cobject.obj, descId)
+            track = c4d.CTrack(obj, descId)
             # insert ctrack into objects timeline
-            cobject.obj.InsertTrackSorted(track)
+            obj.InsertTrackSorted(track)
 
         curve = track.GetCurve()
 
         return curve
 
-    def make_keyframes(self, cobject, descIds, time=None):
+    def make_keyframes(self, cobject, descIds, time=None, delay=0):
         # utility function for making keyframing less cluttered
+
+        # make sure delay is in desired range
+        if delay < 0 or delay > 1:
+            raise ValueError("delay must be between 0-1")
 
         # get curves from descIds
         curves = [self.get_curve(cobject, descId) for descId in descIds]
@@ -155,7 +168,8 @@ class Scene():
         # add keys and set values
         for curve, value in zip(curves, values):
             if time is None:
-                key = curve.AddKey(self.get_time())["key"]
+                key = curve.AddKey(self.get_time() +
+                                   c4d.BaseTime(delay))["key"]
             else:
                 key = curve.AddKey(c4d.BaseTime(time))["key"]
             if type(value) == int:
@@ -181,14 +195,20 @@ class Scene():
                 paramIds = [[descId[0].id, descId[1].id, descId[2].id]
                             for descId in descIds]
 
+        # check whether cobject or material
+        if hasattr(cobject, "obj"):
+            obj = cobject.obj
+        else:
+            obj = cobject
+
         if absolute:
             # set values for params
             for paramId, value in zip(paramIds, values):
-                cobject.obj[paramId] = value
+                obj[paramId] = value
         else:
             for paramId, relative_value in zip(paramIds, values):
                 # get current value for param
-                current_value = cobject.obj[paramId]
+                current_value = obj[paramId]
                 # calculate relative value for param
                 # checks for multiplicative vs additive params
                 if paramId[0] == c4d.ID_BASEOBJECT_SCALE:
@@ -196,7 +216,7 @@ class Scene():
                 else:
                     value = current_value + relative_value
                 # set value for param
-                cobject.obj[paramId] = value
+                obj[paramId] = value
 
     def get_value(self, cobject, descId):
         # gets the value for the corresponding descId for given cobject
@@ -208,8 +228,15 @@ class Scene():
             paramId = (descId[0].id, descId[1].id)
         elif len(descId) == 3:
             paramId = (descId[0].id, descId[1].id, descId[2].id)
+
         # read out value
-        value = cobject.obj[paramId]
+        # check whether cobject or material
+        if hasattr(cobject, "obj"):
+            obj = cobject.obj
+        else:
+            obj = cobject
+
+        value = obj[paramId]
 
         return value
 
@@ -304,14 +331,20 @@ class Scene():
                 # unpack individual animations
                 for animation in animation_group:
                     # unpack data from animations
-                    cobject, values, descIds, absolute = animation
+                    cobject, values, descIds, animation_params = animation
+                    # unpack animation parameters
+                    absolute, rel_delay = animation_params
+                    abs_delay = run_time * rel_delay
                     # keyframe current state
-                    self.make_keyframes(cobject, descIds)
+                    self.make_keyframes(cobject, descIds, delay=abs_delay)
             elif type(animation) is tuple:
                 # unpack data from animation
-                cobject, values, descIds, absolute = animation
+                cobject, values, descIds, animation_params = animation
+                # unpack animation parameters
+                absolute, rel_delay = animation_params
+                abs_delay = run_time * rel_delay
                 # keyframe current state
-                self.make_keyframes(cobject, descIds)
+                self.make_keyframes(cobject, descIds, delay=abs_delay)
 
         # add run_time
         self.add_time(run_time)
@@ -326,14 +359,18 @@ class Scene():
                 # unpack individual animations
                 for animation in animation_group:
                     # unpack data from animations
-                    cobject, values, descIds, absolute = animation
+                    cobject, values, descIds, animation_params = animation
+                    # unpack animation parameters
+                    absolute, rel_delay = animation_params
                     # set the values for corresponding params
                     self.set_values(cobject, descIds, values, absolute)
                     # keyframe current state
                     self.make_keyframes(cobject, descIds)
             elif type(animation) is tuple:
                 # unpack data from animation
-                cobject, values, descIds, absolute = animation
+                cobject, values, descIds, animation_params = animation
+                # unpack animation parameters
+                absolute, rel_delay = animation_params
                 # set the values for corresponding params
                 self.set_values(cobject, descIds, values, absolute)
                 # keyframe current state
