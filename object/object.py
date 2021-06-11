@@ -84,6 +84,12 @@ class CObject():
     def animate(self, animation_name, absolute=False, rel_delay=0, rel_cut_off=0, **params):
         # abstract animation method that calls specific animations using animation_name
 
+        # check value for relative delay, cut off
+        if rel_delay < 0 or rel_delay > 1:
+            raise ValueError("relative delay must be between 0-1!")
+        if rel_cut_off < 0 or rel_cut_off > 1:
+            raise ValueError("relative cut off must be between 0-1!")
+
         animation_data = getattr(CObject, animation_name)(self, **params)
         animation_params = [absolute, rel_delay, rel_cut_off]
 

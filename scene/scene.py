@@ -104,7 +104,7 @@ class Scene():
             descIds = [desc_vis_editor, desc_vis_render]
             values = [c4d.MODE_OFF, c4d.MODE_OFF]
             self.set_values(cobject, descIds, values, absolute=True)
-            self.make_keyframes(cobject, descIds, absolute=True, time=0)
+            self.make_keyframes(cobject, descIds, time=0)
             c4d.EventAdd()
             self.kairos.append(cobject)
 
@@ -170,7 +170,7 @@ class Scene():
 
         return tuple(animations_list)
 
-    def make_keyframes(self, cobject, descIds, absolute, time=None, delay=0, cut_off=0):
+    def make_keyframes(self, cobject, descIds, time=None, delay=0, cut_off=0):
         # utility function for making keyframing less cluttered
 
         # get curves from descIds
@@ -282,7 +282,7 @@ class Scene():
                     # insert child under group
                     child.obj.InsertUnder(cobject.obj)
                     # keyframe visibility
-                    self.make_keyframes(child, descIds, absolute=True)
+                    self.make_keyframes(child, descIds)
                     # add children to chronos
                     self.chronos.append(child)
             # add cobject to kairos
@@ -290,7 +290,7 @@ class Scene():
             # set visibility
             self.set_values(cobject, descIds, values, absolute=True)
             # keyfrme visibility
-            self.make_keyframes(cobject, descIds, absolute=True)
+            self.make_keyframes(cobject, descIds)
             # add cobjects to chronos
             self.chronos.append(cobject)
 
@@ -348,7 +348,7 @@ class Scene():
             abs_delay = run_time * rel_delay
             # keyframe current state
             self.make_keyframes(
-                cobject, descIds, absolute, delay=abs_delay)
+                cobject, descIds, delay=abs_delay)
 
         # add run_time
         self.add_time(run_time)
@@ -365,7 +365,7 @@ class Scene():
             self.set_values(cobject, descIds, values, absolute)
             # keyframe current state
             self.make_keyframes(
-                cobject, descIds, absolute, cut_off=abs_cut_off)
+                cobject, descIds, cut_off=abs_cut_off)
 
     def set(self, *transformations):
         # sets object to end state of animation without playing it
