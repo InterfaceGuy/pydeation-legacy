@@ -103,7 +103,7 @@ class Scene():
                 c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
             descIds = [desc_vis_editor, desc_vis_render]
             values = [c4d.MODE_OFF, c4d.MODE_OFF]
-            self.set_values(cobject, descIds, values, absolute=True)
+            self.set_values(cobject, descIds, values)
             self.make_keyframes(cobject, descIds, time=0)
             c4d.EventAdd()
             self.kairos.append(cobject)
@@ -138,8 +138,8 @@ class Scene():
         self.set_time(time_fin)
 
     @staticmethod
-    def get_curve(cobject, descId):
-        # returns the corresponding curve of the descId
+    def get_tracks(cobject, descIds):
+        # get tracks from descIds
 
         # check whether cobject or material
         if hasattr(cobject, "obj"):
@@ -147,15 +147,17 @@ class Scene():
         else:
             obj = cobject
 
-        track = obj.FindCTrack(descId)
-        if track is None:
-            track = c4d.CTrack(obj, descId)
-            # insert ctrack into objects timeline
-            obj.InsertTrackSorted(track)
+        # find or create tracks
+        tracks = []
+        for descId in descIds:
+            track = obj.FindCTrack(descId)
+            if track is None:
+                track = c4d.CTrack(obj, descId)
+                # insert ctrack into objects timeline
+                obj.InsertTrackSorted(track)
+            tracks.append(track)
 
-        curve = track.GetCurve()
-
-        return curve
+        return tracks
 
     @staticmethod
     def flatten_animations(animations):
@@ -170,13 +172,40 @@ class Scene():
 
         return tuple(animations_list)
 
+    @staticmethod
+    def descs_to_params(descIds):
+        # turns descIds into paramIds
+
+        for descId in descIds:
+            if len(descId) == 1:
+                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
+                paramIds = [[descId[0].id] for descId in descIds]
+            elif len(descId) == 2:
+                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
+            elif len(descId) == 3:
+                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
+                            for descId in descIds]
+
+        return paramIds
+
+    def get_curves(self, cobject, descIds):
+        # returns the corresponding curve of the descId
+
+        # get tracks
+        tracks = self.get_tracks(cobject, descIds)
+
+        # get curves
+        curves = [track.GetCurve() for track in tracks]
+
+        return curves
+
     def make_keyframes(self, cobject, descIds, time=None, delay=0, cut_off=0):
         # utility function for making keyframing less cluttered
 
         # get curves from descIds
-        curves = [self.get_curve(cobject, descId) for descId in descIds]
+        curves = self.get_curves(cobject, descIds)
         # get values from descIds
-        values = [self.get_value(cobject, descId) for descId in descIds]
+        values = self.get_values(cobject, descIds)
 
         # determine time
         if time is None:
@@ -196,19 +225,11 @@ class Scene():
 
         c4d.EventAdd()
 
-    def set_values(self, cobject, descIds, values, absolute):
+    def set_values(self, cobject, descIds, values):
         # sets the values for the corresponding descIds for given cobject
 
         # turn descId into paramId
-        for descId in descIds:
-            if len(descId) == 1:
-                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
-                paramIds = [[descId[0].id] for descId in descIds]
-            elif len(descId) == 2:
-                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
-            elif len(descId) == 3:
-                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
-                            for descId in descIds]
+        paramIds = self.descs_to_params(descIds)
 
         # check whether cobject or material
         if hasattr(cobject, "obj"):
@@ -216,33 +237,15 @@ class Scene():
         else:
             obj = cobject
 
-        if absolute:
-            # set values for params
-            for paramId, value in zip(paramIds, values):
-                obj[paramId] = value
-        else:
-            for paramId, relative_value in zip(paramIds, values):
-                # get current value for param
-                current_value = obj[paramId]
-                # calculate relative value for param
-                # checks for multiplicative vs additive params
-                if paramId[0] == c4d.ID_BASEOBJECT_SCALE:
-                    value = current_value * relative_value
-                else:
-                    value = current_value + relative_value
-                # set value for param
-                obj[paramId] = value
+        # set values for params
+        for paramId, value in zip(paramIds, values):
+            obj[paramId] = value
 
-    def get_value(self, cobject, descId):
+    def get_values(self, cobject, descIds):
         # gets the value for the corresponding descId for given cobject
 
         # turn descId into paramId
-        if len(descId) == 1:
-            paramId = descId[0].id
-        elif len(descId) == 2:
-            paramId = (descId[0].id, descId[1].id)
-        elif len(descId) == 3:
-            paramId = (descId[0].id, descId[1].id, descId[2].id)
+        paramIds = self.descs_to_params(descIds)
 
         # read out value
         # check whether cobject or material
@@ -251,9 +254,9 @@ class Scene():
         else:
             obj = cobject
 
-        value = obj[paramId]
+        values = [obj[paramId] for paramId in paramIds]
 
-        return value
+        return values
 
     def wait(self, time=1):
         self.add_time(time)
@@ -278,7 +281,7 @@ class Scene():
                     # add child to kairos
                     self.add_to_kairos(child)
                     # set visibility
-                    self.set_values(child, descIds, values, absolute=True)
+                    self.set_values(child, descIds, values)
                     # insert child under group
                     child.obj.InsertUnder(cobject.obj)
                     # keyframe visibility
@@ -288,7 +291,7 @@ class Scene():
             # add cobject to kairos
             self.add_to_kairos(cobject)
             # set visibility
-            self.set_values(cobject, descIds, values, absolute=True)
+            self.set_values(cobject, descIds, values)
             # keyfrme visibility
             self.make_keyframes(cobject, descIds)
             # add cobjects to chronos
@@ -312,7 +315,7 @@ class Scene():
                 # add children to scene
                 for child in cobject.children:
                     # set visibility
-                    self.set_values(child, descIds, values, absolute=True)
+                    self.set_values(child, descIds, values)
                     # insert child under group
                     child.obj.InsertUnder(cobject.obj)
                     # keyframe visibility
@@ -320,7 +323,7 @@ class Scene():
                     # add children to chronos
                     self.chronos.append(child)
             # set visibility
-            self.set_values(cobject, descIds, values, absolute=True)
+            self.set_values(cobject, descIds, values)
             # keyfrme visibility
             self.make_keyframes(cobject, descIds)
             # add cobjects to chronos
@@ -344,7 +347,7 @@ class Scene():
             # unpack data from animations
             cobject, values, descIds, animation_params = animation
             # unpack animation parameters
-            absolute, rel_delay, rel_cut_off = animation_params
+            rel_delay, rel_cut_off = animation_params
             abs_delay = run_time * rel_delay
             # keyframe current state
             self.make_keyframes(
@@ -359,10 +362,10 @@ class Scene():
             # unpack data from animations
             cobject, values, descIds, animation_params = animation
             # unpack animation parameters
-            absolute, rel_delay, rel_cut_off = animation_params
+            rel_delay, rel_cut_off = animation_params
             abs_cut_off = run_time * rel_cut_off
             # set the values for corresponding params
-            self.set_values(cobject, descIds, values, absolute)
+            self.set_values(cobject, descIds, values)
             # keyframe current state
             self.make_keyframes(
                 cobject, descIds, cut_off=abs_cut_off)

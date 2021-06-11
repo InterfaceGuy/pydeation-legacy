@@ -81,7 +81,38 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
 
-    def animate(self, animation_name, absolute=False, rel_delay=0, rel_cut_off=0, **params):
+    @staticmethod
+    def filter_descIds(descIds, default_values, input_values):
+        # filters out unchanged values
+
+        descIds_filtered = []
+        values_filtered = []
+
+        for default_value, descId, input_value in zip(default_values, descIds, input_values):
+            if input_value == default_value:
+                continue
+            descIds_filtered.append(descId)
+            values_filtered.append(type(default_value)(input_value))
+
+        return descIds_filtered, values_filtered
+
+    @staticmethod
+    def descs_to_params(descIds):
+        # turns descIds into paramIds
+
+        for descId in descIds:
+            if len(descId) == 1:
+                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
+                paramIds = [[descId[0].id] for descId in descIds]
+            elif len(descId) == 2:
+                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
+            elif len(descId) == 3:
+                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
+                            for descId in descIds]
+
+        return paramIds
+
+    def animate(self, cobject, animation_name, rel_delay=0, rel_cut_off=0, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -90,14 +121,14 @@ class CObject():
         if rel_cut_off < 0 or rel_cut_off > 1:
             raise ValueError("relative cut off must be between 0-1!")
 
-        animation_data = getattr(CObject, animation_name)(self, **params)
-        animation_params = [absolute, rel_delay, rel_cut_off]
+        animation_data = getattr(cobject, animation_name)(**params)
+        animation_params = [rel_delay, rel_cut_off]
 
         animation = (*animation_data, animation_params)
 
         return animation
 
-    def transform(self, x=None, y=None, z=None, h=None, p=None, b=None, scale=None):
+    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, relative=True):
         # transforms the objects position, rotation, scale
 
         descIds = [
@@ -112,21 +143,34 @@ class CObject():
             CObject.descIds["scale_z"]
         ]
 
-        values = [x, y, z,
-                  h, p, b,
-                  scale, scale, scale]
+        s_x = s_y = s_z = scale
+        input_values = [x, y, z, h, p, b, s_x, s_y, s_z]
+        default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+        # get params from descs
+        paramIds = self.descs_to_params(descIds)
+        # read out current values
+        curr_values = [self.obj[paramId] for paramId in paramIds]
 
-        # filter out unchanged values
-        descIds_filtered = []
-        values_filtered = []
+        # calculate absolute values if necessery
+        if relative:
+            # get relative values
+            rel_values = input_values
+            # calculate additive absolute values
+            abs_values_additive = [curr_value + rel_value for curr_value,
+                                   rel_value in zip(curr_values[:6], rel_values[:6])]
+            # calculate multiplicative absolute values
+            abs_values_multiplicative = [
+                curr_value * rel_value for curr_value, rel_value in zip(curr_values[6:], rel_values[6:])]
+            # concatenate to absolute values
+            input_values = abs_values_additive + abs_values_multiplicative
+        else:
+            default_values = curr_values
 
-        for value, descId in zip([x, y, z, h, p, b, scale], descIds):
-            if value is None:
-                continue
-            descIds_filtered.append(descId)
-            values_filtered.append(float(value))
+        # only read out changed values
+        descIds_filtered, input_values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (self, input_values_filtered, descIds_filtered)
 
     def draw(self):
         # draw contours
@@ -148,13 +192,6 @@ class CObject():
 
         return (self.filler_mat, values, descIds)
 
-    def draw_then_fill(self):
-
-        draw_animation = self.animate("draw", rel_cut_off=0.5)
-        fill_animation = self.animate("fill", rel_delay=0.5)
-
-        return [draw_animation, fill_animation]
-
 
 class SplineObject(CObject):
 
@@ -169,36 +206,28 @@ class SplineObject(CObject):
         "plane": c4d.DescID(c4d.DescLevel(c4d.PRIM_PLANE, c4d.DTYPE_LONG, 0))
     }
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
         self.parent = c4d.BaseObject(c4d.Oloft)
         self.parent.SetName(self.obj.GetName())
-        super(SplineObject, self).__init__()
+        super(SplineObject, self).__init__(color=color)
 
 class Rectangle(SplineObject):
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinerectangle)
         # set ideosynchratic default params
         self.obj[c4d.PRIM_RECTANGLE_ROUNDING] = True
         self.obj[c4d.PRIM_RECTANGLE_RADIUS] = 0
         # run universal initialisation
-        super(Rectangle, self).__init__()
+        super(Rectangle, self).__init__(color=color)
 
-    def params(self, width=400, height=400, rounding=0, plane="XZ"):
+    def change_params(self, width=400, height=400, rounding=0, plane="XZ"):
 
         # limit rounding to 0-1 range
         if rounding < 0 or rounding > 1:
             raise ValueError("rounding value must be between 0-1!")
-
-        # calculate values
-        # radius
-        curr_width = self.obj[c4d.PRIM_RECTANGLE_WIDTH]
-        curr_height = self.obj[c4d.PRIM_RECTANGLE_HEIGHT]
-        radius = min(curr_width, curr_height) / 2 * rounding
-        # plane
-        plane = SplineObject.planes[plane]
 
         # gather animation data
         desc_radius = c4d.DescID(c4d.DescLevel(
@@ -211,16 +240,29 @@ class Rectangle(SplineObject):
 
         descIds = [desc_radius, desc_width, desc_height, desc_plane]
 
-        values = [float(radius), float(width), float(height), int(plane)]
+        # calculate values
+        # radius
+        radius = None
+        if rounding is not None:
+            curr_width = self.obj[c4d.PRIM_RECTANGLE_WIDTH]
+            curr_height = self.obj[c4d.PRIM_RECTANGLE_HEIGHT]
+            radius = min(curr_width, curr_height) / 2 * rounding
 
-        return (self, values, descIds)
+        # plane
+        plane = SplineObject.planes[plane]
+
+        # only read out changed values
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, width, height, rounding, plane)
+
+        return (self, values_filtered, descIds_filtered)
 
 class Circle(SplineObject):
 
     RADIUS_X = 200
     RADIUS_Y = 200
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinecircle)
         # set ideosynchratic default params
@@ -228,30 +270,15 @@ class Circle(SplineObject):
         self.obj[c4d.PRIM_CIRCLE_RING] = True
         self.obj[c4d.PRIM_CIRCLE_INNER] = self.obj[c4d.PRIM_CIRCLE_RADIUS]
         # run universal initialisation
-        super(Circle, self).__init__()
+        super(Circle, self).__init__(color=color)
 
-    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
+    def change_params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
 
         # limit ratios to 0-1 range
         if ellipse_ratio < 0 or ellipse_ratio > 1:
             raise ValueError("ellipse ratio value must be between 0-1!")
         if ring_ratio < 0 or ring_ratio > 1:
             raise ValueError("ring ratio value must be between 0-1!")
-
-        # calculate values
-        # radii
-        radius_x = Circle.RADIUS_X
-        radius_y = Circle.RADIUS_Y
-        # radius y
-        if ellipse_axis == "HORIZONTAL":
-            radius_y = Circle.RADIUS_X * ellipse_ratio
-        # radius x
-        elif ellipse_axis == "VERTICAL":
-            radius_x = Circle.RADIUS_Y * ellipse_ratio
-        # inner radius
-        inner_radius = radius_x * ring_ratio
-        # plane
-        plane = SplineObject.planes[plane]
 
         # gather animation data
         desc_radius_x = c4d.DescID(c4d.DescLevel(
@@ -264,31 +291,54 @@ class Circle(SplineObject):
 
         descIds = [desc_radius_x, desc_radius_y, desc_inner_radius, desc_plane]
 
-        values = [float(radius_x), float(radius_y),
-                  float(inner_radius), int(plane)]
+        # calculate values
+        # radii
+        radius_x = None
+        radius_y = None
+        if ellipse_ratio is not 1 or ellipse_axis is not "HORIZONTAL":
+            radius_x = Circle.RADIUS_X
+            radius_y = Circle.RADIUS_Y
+            # radius y
+            if ellipse_axis == "HORIZONTAL":
+                radius_y = Circle.RADIUS_X * ellipse_ratio
+            # radius x
+            elif ellipse_axis == "VERTICAL":
+                radius_x = Circle.RADIUS_Y * ellipse_ratio
+        # inner radius
+        inner_radius = None
+        if ring_ratio is not None:
+            inner_radius = radius_x * ring_ratio
+        # plane
+        plane_id = None
+        if plane is not "XZ":
+            plane_id = SplineObject.planes[plane]
 
-        return (self, values, descIds)
+        # only read out changed values
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, radius_x, radius_y, inner_radius, plane_id)
+
+        return (self, values_filtered, descIds_filtered)
 
 class Sphere(CObject):
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         # create object
         self.obj = c4d.BaseObject(c4d.Osphere)
         # set ideosynchratic default params
 
         # run universal initialisation
-        super(Sphere, self).__init__()
+        super(Sphere, self).__init__(color=color)
 
 
 class Cube(CObject):
 
-    def __init__(self):
+    def __init__(self, color=BLUE):
         # create object
         self.obj = c4d.BaseObject(c4d.Ocube)
         # set ideosynchratic default params
 
         # run universal initialisation
-        super(Cube, self).__init__()
+        super(Cube, self).__init__(color=color)
 
 
 class Cylinder(CObject):
