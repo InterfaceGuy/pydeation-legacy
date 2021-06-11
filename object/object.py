@@ -53,6 +53,10 @@ class CObject():
         self.set_filler_mat(color=self.color)
         # because of workaround set_sketch_mat() is called in add_to_kairos()
 
+    def __str__(self):
+        # class name as string representation for easier debugging
+        return self.__class__.__name__
+
     def set_filler_mat(self, color=BLUE):
         # sets params of filler mat as a function of color
 
@@ -77,8 +81,19 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
 
-    def transform(self, x=0, y=0, z=0, h=0, p=0, b=0, scale=1, absolute=False, rel_delay=0):
+    def animate(self, animation_name, absolute=False, rel_delay=0, rel_cut_off=0, **params):
+        # abstract animation method that calls specific animations using animation_name
+
+        animation_data = getattr(CObject, animation_name)(self, **params)
+        animation_params = [absolute, rel_delay, rel_cut_off]
+
+        animation = (*animation_data, animation_params)
+
+        return animation
+
+    def transform(self, x=None, y=None, z=None, h=None, p=None, b=None, scale=None):
         # transforms the objects position, rotation, scale
+
         descIds = [
             CObject.descIds["pos_x"],
             CObject.descIds["pos_y"],
@@ -91,24 +106,31 @@ class CObject():
             CObject.descIds["scale_z"]
         ]
 
-        values = [float(x), float(y), float(z),
-                  float(h), float(p), float(b),
-                  float(scale), float(scale), float(scale)]
+        values = [x, y, z,
+                  h, p, b,
+                  scale, scale, scale]
 
-        animation_params = [absolute, rel_delay]
+        # filter out unchanged values
+        descIds_filtered = []
+        values_filtered = []
 
-        return (self, values, descIds, animation_params)
+        for value, descId in zip([x, y, z, h, p, b, scale], descIds):
+            if value is None:
+                continue
+            descIds_filtered.append(descId)
+            values_filtered.append(float(value))
 
-    def draw(self, rel_delay=0):
+        return (self, values_filtered, descIds_filtered)
+
+    def draw(self):
         # draw contours
 
         descIds = [CObject.descIds["draw_completion"]]
         values = [1.0]
-        animation_params = [True, rel_delay]
 
-        return (self.sketch_mat, values, descIds, animation_params)
+        return (self.sketch_mat, values, descIds)
 
-    def fill(self, transparency=FILLER_TRANSPARENCY, solid=False, rel_delay=0):
+    def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
         # shifts transparency of filler material
 
         # check solid param
@@ -117,14 +139,13 @@ class CObject():
 
         descIds = [CObject.descIds["filler_transparency"]]
         values = [transparency]
-        animation_params = [True, rel_delay]
 
-        return (self.filler_mat, values, descIds, animation_params)
+        return (self.filler_mat, values, descIds)
 
     def draw_then_fill(self):
 
-        draw_animation = self.draw()
-        fill_animation = self.fill(rel_delay=0.5)
+        draw_animation = self.animate("draw", rel_cut_off=0.5)
+        fill_animation = self.animate("fill", rel_delay=0.5)
 
         return [draw_animation, fill_animation]
 
@@ -159,7 +180,7 @@ class Rectangle(SplineObject):
         # run universal initialisation
         super(Rectangle, self).__init__()
 
-    def params(self, width=400, height=400, rounding=0, plane="XZ", rel_delay=0):
+    def params(self, width=400, height=400, rounding=0, plane="XZ"):
 
         # limit rounding to 0-1 range
         if rounding < 0 or rounding > 1:
@@ -186,9 +207,7 @@ class Rectangle(SplineObject):
 
         values = [float(radius), float(width), float(height), int(plane)]
 
-        animation_params = [True, rel_delay]
-
-        return (self, values, descIds, animation_params)
+        return (self, values, descIds)
 
 class Circle(SplineObject):
 
@@ -205,7 +224,7 @@ class Circle(SplineObject):
         # run universal initialisation
         super(Circle, self).__init__()
 
-    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ", rel_delay=0):
+    def params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
 
         # limit ratios to 0-1 range
         if ellipse_ratio < 0 or ellipse_ratio > 1:
@@ -242,9 +261,7 @@ class Circle(SplineObject):
         values = [float(radius_x), float(radius_y),
                   float(inner_radius), int(plane)]
 
-        animation_params = [True, rel_delay]
-
-        return (self, values, descIds, animation_params)
+        return (self, values, descIds)
 
 class Sphere(CObject):
 

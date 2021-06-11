@@ -49,6 +49,8 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
         sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
+        sketch_vp[c4d.OUTLINEMAT_EDLINES_SHOWLINES] = True
+        sketch_vp[c4d.OUTLINEMAT_EDLINES_REDRAW_FULL] = True
         # set general render params
         render_data[c4d.RDATA_FRAMESEQUENCE] = 3
         render_data[c4d.RDATA_SAVEIMAGE] = False
@@ -102,7 +104,7 @@ class Scene():
             descIds = [desc_vis_editor, desc_vis_render]
             values = [c4d.MODE_OFF, c4d.MODE_OFF]
             self.set_values(cobject, descIds, values, absolute=True)
-            self.make_keyframes(cobject, descIds, time=0)
+            self.make_keyframes(cobject, descIds, absolute=True, time=0)
             c4d.EventAdd()
             self.kairos.append(cobject)
 
@@ -155,23 +157,36 @@ class Scene():
 
         return curve
 
-    def make_keyframes(self, cobject, descIds, time=None, delay=0):
-        # utility function for making keyframing less cluttered
+    @staticmethod
+    def flatten_animations(animations):
+        # unpacks animation groups inside tuple
+        animations_list = []
+        for animation in animations:
+            if type(animation) is tuple:
+                animations_list.append(animation)
+            elif type(animation) is list:
+                for anim in animation:
+                    animations_list.append(anim)
 
-        # make sure delay is in desired range
-        if delay < 0 or delay > 1:
-            raise ValueError("delay must be between 0-1")
+        return tuple(animations_list)
+
+    def make_keyframes(self, cobject, descIds, absolute, time=None, delay=0, cut_off=0):
+        # utility function for making keyframing less cluttered
 
         # get curves from descIds
         curves = [self.get_curve(cobject, descId) for descId in descIds]
+        # get values from descIds
         values = [self.get_value(cobject, descId) for descId in descIds]
+
+        # determine time
+        if time is None:
+            time = self.get_time() + c4d.BaseTime(delay) - c4d.BaseTime(cut_off)
+        else:
+            time = c4d.BaseTime(time)
+
         # add keys and set values
         for curve, value in zip(curves, values):
-            if time is None:
-                key = curve.AddKey(self.get_time() +
-                                   c4d.BaseTime(delay))["key"]
-            else:
-                key = curve.AddKey(c4d.BaseTime(time))["key"]
+            key = curve.AddKey(time)["key"]
             if type(value) == int:
                 key.SetGeData(curve, value)
             elif type(value) == float:
@@ -267,7 +282,7 @@ class Scene():
                     # insert child under group
                     child.obj.InsertUnder(cobject.obj)
                     # keyframe visibility
-                    self.make_keyframes(child, descIds)
+                    self.make_keyframes(child, descIds, absolute=True)
                     # add children to chronos
                     self.chronos.append(child)
             # add cobject to kairos
@@ -275,7 +290,7 @@ class Scene():
             # set visibility
             self.set_values(cobject, descIds, values, absolute=True)
             # keyfrme visibility
-            self.make_keyframes(cobject, descIds)
+            self.make_keyframes(cobject, descIds, absolute=True)
             # add cobjects to chronos
             self.chronos.append(cobject)
 
@@ -322,29 +337,18 @@ class Scene():
         # plays animations of cobjects
 
         # set initial keyframes
+        # unpack animation groups inside tuple
+        animations = self.flatten_animations(animations)
         # unpack individual animations
         for animation in animations:
-            # check for animation group
-            if type(animation) is list:
-                # rename as animation group
-                animation_group = animation
-                # unpack individual animations
-                for animation in animation_group:
-                    # unpack data from animations
-                    cobject, values, descIds, animation_params = animation
-                    # unpack animation parameters
-                    absolute, rel_delay = animation_params
-                    abs_delay = run_time * rel_delay
-                    # keyframe current state
-                    self.make_keyframes(cobject, descIds, delay=abs_delay)
-            elif type(animation) is tuple:
-                # unpack data from animation
-                cobject, values, descIds, animation_params = animation
-                # unpack animation parameters
-                absolute, rel_delay = animation_params
-                abs_delay = run_time * rel_delay
-                # keyframe current state
-                self.make_keyframes(cobject, descIds, delay=abs_delay)
+            # unpack data from animations
+            cobject, values, descIds, animation_params = animation
+            # unpack animation parameters
+            absolute, rel_delay, rel_cut_off = animation_params
+            abs_delay = run_time * rel_delay
+            # keyframe current state
+            self.make_keyframes(
+                cobject, descIds, absolute, delay=abs_delay)
 
         # add run_time
         self.add_time(run_time)
@@ -352,29 +356,16 @@ class Scene():
         # set final keyframes
         # unpack individual animations
         for animation in animations:
-            # check for animation group
-            if type(animation) is list:
-                # rename as animation group
-                animation_group = animation
-                # unpack individual animations
-                for animation in animation_group:
-                    # unpack data from animations
-                    cobject, values, descIds, animation_params = animation
-                    # unpack animation parameters
-                    absolute, rel_delay = animation_params
-                    # set the values for corresponding params
-                    self.set_values(cobject, descIds, values, absolute)
-                    # keyframe current state
-                    self.make_keyframes(cobject, descIds)
-            elif type(animation) is tuple:
-                # unpack data from animation
-                cobject, values, descIds, animation_params = animation
-                # unpack animation parameters
-                absolute, rel_delay = animation_params
-                # set the values for corresponding params
-                self.set_values(cobject, descIds, values, absolute)
-                # keyframe current state
-                self.make_keyframes(cobject, descIds)
+            # unpack data from animations
+            cobject, values, descIds, animation_params = animation
+            # unpack animation parameters
+            absolute, rel_delay, rel_cut_off = animation_params
+            abs_cut_off = run_time * rel_cut_off
+            # set the values for corresponding params
+            self.set_values(cobject, descIds, values, absolute)
+            # keyframe current state
+            self.make_keyframes(
+                cobject, descIds, absolute, cut_off=abs_cut_off)
 
     def set(self, *transformations):
         # sets object to end state of animation without playing it
