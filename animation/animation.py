@@ -5,13 +5,34 @@ class Animation():
     """
 
     def __new__(cls, animation_name, *cobjects, **params):
+        # calss animation method of cobjects and passes params
+
         animations = []
-        for cobject in cobjects:
+        # flatten input in case of groups
+        flattened_cobjects = cls.flatten_input(cobjects)
+        # gather animations
+        for cobject in flattened_cobjects:
             animation = getattr(cobject, "animate")(
                 cobject, animation_name, **params)
             animations.append(animation)
 
         return animations
+
+    @staticmethod
+    def flatten_input(cobjects):
+        # checks for groups and flattens list
+
+        flattened_cobjects = []
+
+        for cobject in cobjects:
+            if hasattr(cobject, "children"):
+                for child in cobject.children:
+                    flattened_cobjects.append(child)
+                continue
+            flattened_cobjects.append(cobject)
+
+        return flattened_cobjects
+
 
 class Draw(Animation):
 

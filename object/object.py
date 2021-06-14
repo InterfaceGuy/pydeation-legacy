@@ -10,6 +10,8 @@ c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
 class CObject():
     """abstract class for adding objects to scene"""
 
+    # metadata
+    ctype = "CObject"
     # universal descIds
     descIds = {
         "pos": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0)),
@@ -35,6 +37,8 @@ class CObject():
                               c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "draw_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0))
+        "vis_editor" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
+        "vis_render" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
     def __init__(self, color=BLUE):
 
@@ -112,6 +116,16 @@ class CObject():
 
         return paramIds
 
+    def get_current_values(self, descIds):
+        # reads out current values from descIds
+
+        # get paramIds from descIds
+        paramIds = self.descs_to_params(descIds)
+        # determine current values
+        curr_values = [self.obj[paramId] for paramId in paramIds]
+
+        return curr_values
+
     def animate(self, cobject, animation_name, rel_delay=0, rel_cut_off=0, **params):
         # abstract animation method that calls specific animations using animation_name
 
@@ -131,30 +145,28 @@ class CObject():
     def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, relative=True):
         # transforms the objects position, rotation, scale
 
+        # gather descIds
         descIds = [
-            CObject.descIds["pos_x"],
-            CObject.descIds["pos_y"],
-            CObject.descIds["pos_z"],
-            CObject.descIds["rot_h"],
-            CObject.descIds["rot_p"],
-            CObject.descIds["rot_b"],
-            CObject.descIds["scale_x"],
-            CObject.descIds["scale_y"],
-            CObject.descIds["scale_z"]
+            self.descIds["pos_x"],
+            self.descIds["pos_y"],
+            self.descIds["pos_z"],
+            self.descIds["rot_h"],
+            self.descIds["rot_p"],
+            self.descIds["rot_b"],
+            self.descIds["scale_x"],
+            self.descIds["scale_y"],
+            self.descIds["scale_z"]
         ]
 
-        s_x = s_y = s_z = scale
-        input_values = [x, y, z, h, p, b, s_x, s_y, s_z]
-        default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
-        # get params from descs
-        paramIds = self.descs_to_params(descIds)
+        # determine default and input values
         # read out current values
-        curr_values = [self.obj[paramId] for paramId in paramIds]
+        curr_values = self.get_current_values(descIds)
 
-        # calculate absolute values if necessery
+        # convert parameters
+        s_x = s_y = s_z = scale
         if relative:
             # get relative values
-            rel_values = input_values
+            rel_values = [x, y, z, h, p, b, s_x, s_y, s_z]
             # calculate additive absolute values
             abs_values_additive = [curr_value + rel_value for curr_value,
                                    rel_value in zip(curr_values[:6], rel_values[:6])]
@@ -163,22 +175,38 @@ class CObject():
                 curr_value * rel_value for curr_value, rel_value in zip(curr_values[6:], rel_values[6:])]
             # concatenate to absolute values
             input_values = abs_values_additive + abs_values_multiplicative
+            default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
         else:
+            input_values = [x, y, z, h, p, b, s_x, s_y, s_z]
             default_values = curr_values
 
-        # only read out changed values
-        descIds_filtered, input_values_filtered = self.filter_descIds(
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, input_values_filtered, descIds_filtered)
+        return (self, values_filtered, descIds_filtered)
 
-    def draw(self):
+    def draw(self, completion=1.0):
         # draw contours
 
-        descIds = [CObject.descIds["draw_completion"]]
-        values = [1.0]
+        # gather descIds
+        descIds = [self.descIds["draw_completion"], self.descIds["vis_editor"]]
 
-        return (self.sketch_mat, values, descIds)
+        # determine default and input values
+        # convert parameters
+        if completion == 0.0:
+            vis_editor = False
+        else:
+            vis_editor = True
+
+        input_values = [completion, vis_editor]
+        default_values = self.get_current_values(descIds)
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (self.sketch_mat, values_filtered, descIds_filtered)
 
     def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
         # shifts transparency of filler material
@@ -187,13 +215,16 @@ class CObject():
         if solid:
             transparency = 0
 
-        descIds = [CObject.descIds["filler_transparency"]]
+        descIds = [self.descIds["filler_transparency"]]
         values = [transparency]
 
         return (self.filler_mat, values, descIds)
 
 
 class SplineObject(CObject):
+
+    # metadata
+    ctype = "SplineObject"
 
     planes = {
         "XY": 0,
@@ -223,13 +254,9 @@ class Rectangle(SplineObject):
         # run universal initialisation
         super(Rectangle, self).__init__(color=color)
 
-    def change_params(self, width=400, height=400, rounding=0, plane="XZ"):
+    def change_params(self, width=400.0, height=400.0, rounding=0.0, plane="XZ"):
 
-        # limit rounding to 0-1 range
-        if rounding < 0 or rounding > 1:
-            raise ValueError("rounding value must be between 0-1!")
-
-        # gather animation data
+        # gather descIds
         desc_radius = c4d.DescID(c4d.DescLevel(
             c4d.PRIM_RECTANGLE_RADIUS, c4d.DTYPE_REAL, 0))
         desc_width = c4d.DescID(c4d.DescLevel(
@@ -240,20 +267,26 @@ class Rectangle(SplineObject):
 
         descIds = [desc_radius, desc_width, desc_height, desc_plane]
 
-        # calculate values
+        # determine default and input values
+        # read out current values
+        curr_values = self.get_current_values(descIds)
+        curr_radius, curr_width, curr_height, curr_plane_id = curr_values
+
+        # convert parameters
+        # limit rounding to 0-1 range
+        if rounding < 0 or rounding > 1:
+            raise ValueError("rounding value must be between 0-1!")
         # radius
-        radius = None
-        if rounding is not None:
-            curr_width = self.obj[c4d.PRIM_RECTANGLE_WIDTH]
-            curr_height = self.obj[c4d.PRIM_RECTANGLE_HEIGHT]
-            radius = min(curr_width, curr_height) / 2 * rounding
-
+        radius = min(curr_width, curr_height) / 2 * rounding
         # plane
-        plane = SplineObject.planes[plane]
+        plane_id = SplineObject.planes[plane]
 
-        # only read out changed values
+        input_values = [radius, width, height, plane_id]
+        default_values = curr_values
+
+        # filter out unchanged variables
         descIds_filtered, values_filtered = self.filter_descIds(
-            descIds, width, height, rounding, plane)
+            descIds, default_values, input_values)
 
         return (self, values_filtered, descIds_filtered)
 
@@ -272,15 +305,9 @@ class Circle(SplineObject):
         # run universal initialisation
         super(Circle, self).__init__(color=color)
 
-    def change_params(self, ellipse_ratio=1, ellipse_axis="HORIZONTAL", ring_ratio=1, plane="XZ"):
+    def change_params(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ"):
 
-        # limit ratios to 0-1 range
-        if ellipse_ratio < 0 or ellipse_ratio > 1:
-            raise ValueError("ellipse ratio value must be between 0-1!")
-        if ring_ratio < 0 or ring_ratio > 1:
-            raise ValueError("ring ratio value must be between 0-1!")
-
-        # gather animation data
+        # gather descIds
         desc_radius_x = c4d.DescID(c4d.DescLevel(
             c4d.PRIM_CIRCLE_RADIUS, c4d.DTYPE_REAL, 0))
         desc_radius_y = c4d.DescID(c4d.DescLevel(
@@ -291,31 +318,36 @@ class Circle(SplineObject):
 
         descIds = [desc_radius_x, desc_radius_y, desc_inner_radius, desc_plane]
 
-        # calculate values
-        # radii
-        radius_x = None
-        radius_y = None
-        if ellipse_ratio is not 1 or ellipse_axis is not "HORIZONTAL":
-            radius_x = Circle.RADIUS_X
-            radius_y = Circle.RADIUS_Y
-            # radius y
-            if ellipse_axis == "HORIZONTAL":
-                radius_y = Circle.RADIUS_X * ellipse_ratio
-            # radius x
-            elif ellipse_axis == "VERTICAL":
-                radius_x = Circle.RADIUS_Y * ellipse_ratio
-        # inner radius
-        inner_radius = None
-        if ring_ratio is not None:
-            inner_radius = radius_x * ring_ratio
-        # plane
-        plane_id = None
-        if plane is not "XZ":
-            plane_id = SplineObject.planes[plane]
+        # determine default and input values
+        # read out current values
+        curr_values = self.get_current_values(descIds)
+        curr_radius_x, curr_radius_y, curr_inner_radius, curr_plane_id = curr_values
 
-        # only read out changed values
+        # convert parameters
+        # limit ratios to 0-1 range
+        if ellipse_ratio < 0 or ellipse_ratio > 1:
+            raise ValueError("ellipse ratio value must be between 0-1!")
+        if ring_ratio < 0 or ring_ratio > 1:
+            raise ValueError("ring ratio value must be between 0-1!")
+        # radius y
+        if ellipse_axis == "HORIZONTAL":
+            radius_x = Circle.RADIUS_X
+            radius_y = radius_x * ellipse_ratio
+        # radius x
+        elif ellipse_axis == "VERTICAL":
+            radius_y = Circle.RADIUS_Y
+            radius_x = radius_y * ellipse_ratio
+        # inner radius
+        inner_radius = radius_x * ring_ratio
+        # plane
+        plane_id = SplineObject.planes[plane]
+
+        input_values = [radius_x, radius_y, inner_radius, plane_id]
+        default_values = curr_values
+
+        # filter out unchanged values
         descIds_filtered, values_filtered = self.filter_descIds(
-            descIds, radius_x, radius_y, inner_radius, plane_id)
+            descIds, default_values, input_values)
 
         return (self, values_filtered, descIds_filtered)
 
@@ -360,6 +392,9 @@ class Group(CObject):
     """
     creates null and adds cobjects as children
     """
+
+    # metadata
+    ctype = "Group"
 
     def __init__(self, *cobjects):
 
