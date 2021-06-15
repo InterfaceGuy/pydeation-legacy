@@ -60,53 +60,127 @@ class Scene():
         self.kairos = []
         self.chronos = []
 
-    def add_to_kairos(self, cobject):
-        # checks whether object is in kairos and if not adds it
+    def add_to_kairos_cobject(self, cobject):
+        # handles kairos for cobjects
+
+        # check if already in kairos
         if (cobject in self.kairos):
             pass
         else:
-
             # add object to kairos
             self.doc.InsertObject(cobject.obj)
-
             # add object's materials to kairos
             self.doc.InsertMaterial(cobject.filler_mat)
-            # check for spline object
-            if hasattr(cobject, "parent"):
-                # add parent to kairos
-                self.doc.InsertObject(cobject.parent)
-                # make cobject child of parent
-                cobject.obj.InsertUnder(cobject.parent)
-                # apply filler material to parent
-                cobject.parent.InsertTag(cobject.filler_tag)
-                # select cobject for sketch material workaround
-                self.doc.SetActiveObject(cobject.parent)
-
-            else:
-                # apply filler material to cobject
-                cobject.obj.InsertTag(cobject.filler_tag)
-                # select cobject for sketch material workaround
-                self.doc.SetActiveObject(cobject.obj)
-
+            # apply filler material to cobject
+            cobject.obj.InsertTag(cobject.filler_tag)
+            # select cobject for sketch material workaround
+            self.doc.SetActiveObject(cobject.obj)
             # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
             c4d.CallCommand(1011012)
             c4d.CallCommand(100004788, 50038)  # New Tag
+            # write to attributes
             cobject.sketch_tag = self.doc.GetActiveTag()
             cobject.sketch_mat = self.doc.GetFirstMaterial()
             # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
             cobject.set_sketch_mat(color=cobject.color)
-
             # set to hidden at frame zero
             desc_vis_editor = c4d.DescID(c4d.DescLevel(
                 c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-            desc_vis_render = c4d.DescID(c4d.DescLevel(
-                c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
-            descIds = [desc_vis_editor, desc_vis_render]
-            values = [c4d.MODE_OFF, c4d.MODE_OFF]
+            descIds = [desc_vis_editor]
+            values = [c4d.MODE_OFF]
             self.set_values(cobject, descIds, values)
             self.make_keyframes(cobject, descIds, time=0)
-            c4d.EventAdd()
+            # add spline object to kairos list
             self.kairos.append(cobject)
+            # update cinema
+            c4d.EventAdd()
+
+    def add_to_kairos_spline_object(self, spline_object):
+        # handles kairos for spline objects
+
+        # check if already in kairos
+        if (spline_object in self.kairos):
+            pass
+        else:
+            # add object to kairos
+            self.doc.InsertObject(spline_object.obj)
+            # add object's materials to kairos
+            self.doc.InsertMaterial(spline_object.filler_mat)
+            # add parent to kairos
+            self.doc.InsertObject(spline_object.parent)
+            # make spline_object child of parent
+            spline_object.obj.InsertUnder(spline_object.parent)
+            # apply filler material to parent
+            spline_object.parent.InsertTag(spline_object.filler_tag)
+            # select parent for sketch material workaround
+            self.doc.SetActiveObject(spline_object.parent)
+            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
+            c4d.CallCommand(1011012)
+            c4d.CallCommand(100004788, 50038)  # New Tag
+            # write to attributes
+            spline_object.sketch_tag = self.doc.GetActiveTag()
+            spline_object.sketch_mat = self.doc.GetFirstMaterial()
+            # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
+            spline_object.set_sketch_mat(color=spline_object.color)
+            # set to hidden at frame zero
+            desc_vis_editor = c4d.DescID(c4d.DescLevel(
+                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
+            descIds = [desc_vis_editor]
+            values = [c4d.MODE_OFF]
+            self.set_values(spline_object, descIds, values)
+            self.make_keyframes(spline_object, descIds, time=0)
+            # add spline object to kairos list
+            self.kairos.append(spline_object)
+            # update cinema
+            c4d.EventAdd()
+
+    def add_to_kairos_group(self, group_object):
+        # handles kairos for groups
+
+        # add group object to kairos
+        self.doc.InsertObject(group_object.obj)
+        self.kairos.append(group_object)
+        # add children to kairos
+        for child in group_object.children:
+            # check object type
+            # cobject
+            if child.ctype == "CObject":
+                # add cobject to kairos
+                self.add_to_kairos_cobject(child)
+                # insert cobject under group object
+                child.obj.InsertUnder(child.group_object.obj)
+            # spline object
+            elif child.ctype == "SplineObject":
+                # add spline object to kairos
+                self.add_to_kairos_spline_object(child)
+                # insert spline object under group object
+                child.parent.InsertUnder(child.group_object.obj)
+
+    def add_to_kairos(self, cobject):
+        # checks whether object is in kairos and if not adds it
+
+        # check if already added
+        if (cobject in self.kairos):
+            pass
+        else:
+            # check for group
+            if cobject.ctype == "Group":
+                self.add_to_kairos_group(cobject)
+            # check for group member
+            elif hasattr(cobject, "group_object"):
+                # add group object to kairos
+                self.add_to_kairos(cobject.group_object)
+            # individual cobject
+            else:
+                # check object type
+                # cobject
+                if cobject.ctype == "CObject":
+                    # add cobject to kairos
+                    self.add_to_kairos_cobject(cobject)
+                # spline object
+                elif cobject.ctype == "SplineObject":
+                    # add spline object to kairos
+                    self.add_to_kairos_spline_object(cobject)
 
     def finish(self):
         # set maximum time to time after last animation
@@ -137,15 +211,11 @@ class Scene():
         time_fin = time_ini + c4d.BaseTime(run_time)
         self.set_time(time_fin)
 
-    @staticmethod
-    def get_tracks(cobject, descIds):
+    def get_tracks(self, cobject, descIds):
         # get tracks from descIds
 
-        # check whether cobject or material
-        if hasattr(cobject, "obj"):
-            obj = cobject.obj
-        else:
-            obj = cobject
+        # get relevant obj form type
+        obj = self.get_from_type(cobject)
 
         # find or create tracks
         tracks = []
@@ -158,19 +228,6 @@ class Scene():
             tracks.append(track)
 
         return tracks
-
-    @staticmethod
-    def flatten_animations(animations):
-        # unpacks animation groups inside tuple
-        animations_list = []
-        for animation in animations:
-            if type(animation) is tuple:
-                animations_list.append(animation)
-            elif type(animation) is list:
-                for anim in animation:
-                    animations_list.append(anim)
-
-        return tuple(animations_list)
 
     @staticmethod
     def descs_to_params(descIds):
@@ -225,17 +282,28 @@ class Scene():
 
         c4d.EventAdd()
 
+    @staticmethod
+    def get_from_type(cobject):
+        # checks type and returns relevant object as obj
+
+        if hasattr(cobject, "ctype"):
+            if cobject.ctype == "CObject":
+                obj = cobject.obj
+            elif cobject.ctype == "SplineObject":
+                obj = cobject.parent
+        else:  # is material
+            obj = cobject
+
+        return obj
+
     def set_values(self, cobject, descIds, values):
         # sets the values for the corresponding descIds for given cobject
 
         # turn descId into paramId
         paramIds = self.descs_to_params(descIds)
 
-        # check whether cobject or material
-        if hasattr(cobject, "obj"):
-            obj = cobject.obj
-        else:
-            obj = cobject
+        # get relevant obj form type
+        obj = self.get_from_type(cobject)
 
         # set values for params
         for paramId, value in zip(paramIds, values):
@@ -248,11 +316,8 @@ class Scene():
         paramIds = self.descs_to_params(descIds)
 
         # read out value
-        # check whether cobject or material
-        if hasattr(cobject, "obj"):
-            obj = cobject.obj
-        else:
-            obj = cobject
+        # get relevant obj form type
+        obj = self.get_from_type(cobject)
 
         values = [obj[paramId] for paramId in paramIds]
 
@@ -336,6 +401,19 @@ class Scene():
         # remove cobjects from chronos
         self.chronos.clear()
 
+    @staticmethod
+    def flatten_animations(animations):
+        # unpacks animation groups inside tuple
+        animations_list = []
+        for animation in animations:
+            if type(animation) is tuple:
+                animations_list.append(animation)
+            elif type(animation) is list:
+                for anim in animation:
+                    animations_list.append(anim)
+
+        return tuple(animations_list)
+
     def play(self, *animations, run_time=1):
         # plays animations of cobjects
 
@@ -347,11 +425,22 @@ class Scene():
             # unpack data from animations
             cobject, values, descIds, animation_params = animation
             # unpack animation parameters
-            rel_delay, rel_cut_off = animation_params
+            rel_delay, rel_cut_off, animation_type = animation_params
             abs_delay = run_time * rel_delay
+
+            # check animation type
+            if animation_type == "fill_type":
+                target = cobject.filler_mat
+            elif animation_type == "sketch_type":
+                target = cobject.sketch_mat
+            elif animation_type == "object_type":
+                target = cobject
+            else:
+                raise TypeError("please specify valid animation type")
+
             # keyframe current state
             self.make_keyframes(
-                cobject, descIds, delay=abs_delay)
+                target, descIds, delay=abs_delay)
 
         # add run_time
         self.add_time(run_time)
@@ -362,13 +451,24 @@ class Scene():
             # unpack data from animations
             cobject, values, descIds, animation_params = animation
             # unpack animation parameters
-            rel_delay, rel_cut_off = animation_params
+            rel_delay, rel_cut_off, animation_type = animation_params
             abs_cut_off = run_time * rel_cut_off
+
+            # check animation type
+            if animation_type == "fill_type":
+                target = cobject.filler_mat
+            elif animation_type == "sketch_type":
+                target = cobject.sketch_mat
+            elif animation_type == "object_type":
+                target = cobject
+            else:
+                raise TypeError("please specify valid animation type")
+
             # set the values for corresponding params
-            self.set_values(cobject, descIds, values)
+            self.set_values(target, descIds, values)
             # keyframe current state
             self.make_keyframes(
-                cobject, descIds, cut_off=abs_cut_off)
+                target, descIds, cut_off=abs_cut_off)
 
     def set(self, *transformations):
         # sets object to end state of animation without playing it

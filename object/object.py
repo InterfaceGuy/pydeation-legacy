@@ -36,9 +36,9 @@ class CObject():
         "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "draw_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
-        "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0))
-        "vis_editor" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
-        "vis_render" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+        "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
+        "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
+        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
     def __init__(self, color=BLUE):
 
@@ -51,6 +51,11 @@ class CObject():
         self.filler_tag = c4d.BaseTag(c4d.Ttexture)  # filler tag
         # assign material to tag
         self.filler_tag.SetMaterial(self.filler_mat)
+
+        # create container for sketch material - CHANGE AFTER REPLACING WORKAROUND
+        self.sketch_mat = None
+        # create tag
+        self.sketch_tag = None
 
         # set universal default params
         self.color = color
@@ -116,17 +121,22 @@ class CObject():
 
         return paramIds
 
-    def get_current_values(self, descIds):
+    def get_current_values(self, descIds, mode=None):
         # reads out current values from descIds
 
         # get paramIds from descIds
         paramIds = self.descs_to_params(descIds)
         # determine current values
-        curr_values = [self.obj[paramId] for paramId in paramIds]
+        if mode == "fill":
+            curr_values = [self.filler_mat[paramId] for paramId in paramIds]
+        elif mode == "sketch":
+            curr_values = [self.sketch_mat[paramId] for paramId in paramIds]
+        else:
+            curr_values = [self.obj[paramId] for paramId in paramIds]
 
         return curr_values
 
-    def animate(self, cobject, animation_name, rel_delay=0, rel_cut_off=0, **params):
+    def animate(self, cobject, animation_name, animation_type, rel_delay=0, rel_cut_off=0, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -136,7 +146,7 @@ class CObject():
             raise ValueError("relative cut off must be between 0-1!")
 
         animation_data = getattr(cobject, animation_name)(**params)
-        animation_params = [rel_delay, rel_cut_off]
+        animation_params = [rel_delay, rel_cut_off, animation_type]
 
         animation = (*animation_data, animation_params)
 
@@ -147,15 +157,15 @@ class CObject():
 
         # gather descIds
         descIds = [
-            self.descIds["pos_x"],
-            self.descIds["pos_y"],
-            self.descIds["pos_z"],
-            self.descIds["rot_h"],
-            self.descIds["rot_p"],
-            self.descIds["rot_b"],
-            self.descIds["scale_x"],
-            self.descIds["scale_y"],
-            self.descIds["scale_z"]
+            CObject.descIds["pos_x"],
+            CObject.descIds["pos_y"],
+            CObject.descIds["pos_z"],
+            CObject.descIds["rot_h"],
+            CObject.descIds["rot_p"],
+            CObject.descIds["rot_b"],
+            CObject.descIds["scale_x"],
+            CObject.descIds["scale_y"],
+            CObject.descIds["scale_z"]
         ]
 
         # determine default and input values
@@ -186,27 +196,43 @@ class CObject():
 
         return (self, values_filtered, descIds_filtered)
 
-    def draw(self, completion=1.0):
-        # draw contours
+    def visibility_editor(self, mode="ON"):
+        # toggle visibility in editor
 
         # gather descIds
-        descIds = [self.descIds["draw_completion"], self.descIds["vis_editor"]]
+        descIds = [CObject.descIds["vis_editor"]]
+
+        # convert parameters
+        if mode == "ON":
+            vis_editor = c4d.MODE_ON
+        elif mode == "OFF":
+            vis_editor = c4d.MODE_OFF
 
         # determine default and input values
-        # convert parameters
-        if completion == 0.0:
-            vis_editor = False
-        else:
-            vis_editor = True
-
-        input_values = [completion, vis_editor]
+        input_values = [vis_editor]
         default_values = self.get_current_values(descIds)
 
         # filter out unchanged variables
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self.sketch_mat, values_filtered, descIds_filtered)
+        return (self, values_filtered, descIds_filtered)
+
+    def draw(self, completion=1.0):
+        # draw contours
+
+        # gather descIds
+        descIds = [CObject.descIds["draw_completion"]]
+
+        # determine default and input values
+        input_values = [completion]
+        default_values = self.get_current_values(descIds, mode="sketch")
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (self, values_filtered, descIds_filtered)
 
     def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
         # shifts transparency of filler material
@@ -215,10 +241,10 @@ class CObject():
         if solid:
             transparency = 0
 
-        descIds = [self.descIds["filler_transparency"]]
+        descIds = [CObject.descIds["filler_transparency"]]
         values = [transparency]
 
-        return (self.filler_mat, values, descIds)
+        return (self, values, descIds)
 
 
 class SplineObject(CObject):
@@ -406,3 +432,5 @@ class Group(CObject):
         # add cobjects as children
         for cobject in cobjects:
             self.children.append(cobject)
+            # mark children as group member
+            cobject.group_object = self

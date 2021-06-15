@@ -4,7 +4,7 @@ class Animation():
     takes in cobjects and groups and returns animations to pass to play() method
     """
 
-    def __new__(cls, animation_name, *cobjects, **params):
+    def __new__(cls, animation_name, animation_type, *cobjects, **params):
         # calss animation method of cobjects and passes params
 
         animations = []
@@ -13,7 +13,7 @@ class Animation():
         # gather animations
         for cobject in flattened_cobjects:
             animation = getattr(cobject, "animate")(
-                cobject, animation_name, **params)
+                cobject, animation_name, animation_type, **params)
             animations.append(animation)
 
         return animations
@@ -38,7 +38,11 @@ class Draw(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = super().__new__(cls, "draw", *cobjects, **params)
+        draw_animations = super().__new__(cls, "draw", "sketch_type", *cobjects, **params)
+        visibility_editor_animations = super().__new__(cls, "visibility_editor",
+                                                       "object_type", rel_cut_off=0.99, *cobjects, **params)
+
+        animations = draw_animations + visibility_editor_animations
 
         return animations
 
@@ -46,7 +50,7 @@ class Fill(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = super().__new__(cls, "fill", *cobjects, **params)
+        animations = super().__new__(cls, "fill", "fill_type", *cobjects, **params)
 
         return animations
 
