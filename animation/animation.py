@@ -38,9 +38,23 @@ class Draw(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        draw_animations = super().__new__(cls, "draw", "sketch_type", *cobjects, **params)
-        visibility_editor_animations = super().__new__(cls, "visibility_editor",
-                                                       "object_type", rel_cut_off=0.99, *cobjects, **params)
+        draw_animations = Animation.__new__(
+            cls, "draw", "sketch_type", *cobjects, **params)
+        visibility_editor_animations = Animation.__new__(cls, "visibility_editor",
+                                                         "object_type", rel_cut_off=0.99, *cobjects, **params)
+
+        animations = draw_animations + visibility_editor_animations
+
+        return animations
+
+class UnDraw(Animation):
+
+    def __new__(cls, *cobjects, **params):
+
+        draw_animations = Animation.__new__(cls, "draw", "sketch_type",
+                                            completion=0.0, *cobjects, **params)
+        visibility_editor_animations = Animation.__new__(cls, "visibility_editor",
+                                                         "object_type", mode="OFF", *cobjects, **params)
 
         animations = draw_animations + visibility_editor_animations
 
@@ -50,7 +64,37 @@ class Fill(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = super().__new__(cls, "fill", "fill_type", *cobjects, **params)
+        fill_animations = Animation.__new__(
+            cls, "fill", "fill_type", *cobjects, **params)
+        # visibility_editor_animations = Animation.__new__(cls, "visibility_editor",
+        #                                                 "object_type", rel_cut_off=0.99, *cobjects, **params)
+
+        #animations = fill_animations + visibility_editor_animations
+
+        return fill_animations
+
+class UnFill(Animation):
+
+    def __new__(cls, *cobjects, **params):
+
+        fill_animations = Animation.__new__(cls, "fill", "fill_type",
+                                            transparency=1, *cobjects, **params)
+        visibility_editor_animations = Animation.__new__(cls, "visibility_editor",
+                                                         "object_type", rel_delay=0.99, mode="OFF", *cobjects, **params)
+
+        animations = fill_animations + visibility_editor_animations
+
+        return animations
+
+class DrawThenFill(Draw, Fill):
+
+    def __new__(cls, *cobjects, **params):
+
+        draw_animations = Draw.__new__(
+            cls, rel_cut_off=0.5, *cobjects, **params)
+        fill_animations = Fill.__new__(cls, rel_delay=0.5, *cobjects, **params)
+
+        animations = draw_animations + fill_animations
 
         return animations
 
@@ -58,7 +102,8 @@ class Transform(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = super().__new__(cls, "transform", *cobjects, **params)
+        animations = Animation.__new__(
+            cls, "transform", "object_type", *cobjects, **params)
 
         return animations
 
@@ -66,6 +111,7 @@ class ChangeParams(Animation):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = super().__new__(cls, "change_params", *cobjects, **params)
+        animations = Animation.__new__(cls, "change_params",
+                                       "object_type", *cobjects, **params)
 
         return animations

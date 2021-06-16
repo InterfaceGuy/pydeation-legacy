@@ -84,7 +84,7 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = 3
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
-        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = True
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = False
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_AUTODRAW] = True
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
