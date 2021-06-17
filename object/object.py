@@ -1,5 +1,6 @@
 import c4d
 from pydeationlib.constants import *
+from pydeationlib.animation.animation import Animation
 
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
@@ -145,10 +146,11 @@ class CObject():
         if rel_cut_off < 0 or rel_cut_off > 1:
             raise ValueError("relative cut off must be between 0-1!")
 
-        animation_data = getattr(cobject, animation_name)(**params)
-        animation_params = [rel_delay, rel_cut_off, animation_type]
+        values, descIds = getattr(cobject, animation_name)(**params)
+        rel_run_time = (rel_delay, rel_cut_off)
 
-        animation = (*animation_data, animation_params)
+        animation = Animation(self, descIds, values,
+                              animation_type, rel_run_time)
 
         return animation
 
@@ -194,7 +196,7 @@ class CObject():
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
     def visibility_editor(self, mode="ON"):
         # toggle visibility in editor
@@ -216,7 +218,7 @@ class CObject():
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
     def draw(self, completion=1.0):
         # draw contours
@@ -232,7 +234,7 @@ class CObject():
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
     def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
         # shifts transparency of filler material
@@ -244,7 +246,7 @@ class CObject():
         descIds = [CObject.descIds["filler_transparency"]]
         values = [transparency]
 
-        return (self, values, descIds)
+        return (values, descIds)
 
 
 class SplineObject(CObject):
@@ -314,7 +316,7 @@ class Rectangle(SplineObject):
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
 class Circle(SplineObject):
 
@@ -375,7 +377,7 @@ class Circle(SplineObject):
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
 class Sphere(CObject):
 
