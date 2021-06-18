@@ -77,6 +77,7 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
+        self.filler_mat[c4d.MATERIAL_DISPLAY_USE_LUMINANCE] = False
 
     def set_sketch_mat(self, color=BLUE):
         # sets params of filler mat as a function of color
@@ -137,17 +138,17 @@ class CObject():
 
         return curr_values
 
-    def animate(self, cobject, animation_name, animation_type, rel_delay=0, rel_cut_off=0, **params):
+    def animate(self, cobject, animation_name, animation_type, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
-        if rel_delay < 0 or rel_delay > 1:
+        if rel_start_point < 0 or rel_start_point > 1:
             raise ValueError("relative delay must be between 0-1!")
-        if rel_cut_off < 0 or rel_cut_off > 1:
+        if rel_end_point < 0 or rel_end_point > 1:
             raise ValueError("relative cut off must be between 0-1!")
 
         values, descIds = getattr(cobject, animation_name)(**params)
-        rel_run_time = (rel_delay, rel_cut_off)
+        rel_run_time = (rel_start_point, rel_end_point)
 
         animation = Animation(self, descIds, values,
                               animation_type, rel_run_time)
@@ -200,6 +201,7 @@ class CObject():
 
     def visibility_editor(self, mode="ON"):
         # toggle visibility in editor
+        # not used anymore!
 
         # gather descIds
         descIds = [CObject.descIds["vis_editor"]]

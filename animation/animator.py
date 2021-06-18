@@ -1,3 +1,6 @@
+from pydeationlib.animation.animation import *
+
+
 class Animator():
     """
     abstract class for animations
@@ -40,12 +43,8 @@ class Draw(Animator):
 
         draw_animations = Animator.__new__(
             cls, "draw", "sketch_type", *cobjects, **params)
-        visibility_editor_animations = Animator.__new__(cls, "visibility_editor",
-                                                        "object_type", rel_cut_off=0.99, *cobjects, **params)
 
-        animations = draw_animations + visibility_editor_animations
-
-        return animations
+        return draw_animations
 
 class UnDraw(Animator):
 
@@ -53,12 +52,8 @@ class UnDraw(Animator):
 
         draw_animations = Animator.__new__(cls, "draw", "sketch_type",
                                            completion=0.0, *cobjects, **params)
-        visibility_editor_animations = Animator.__new__(cls, "visibility_editor",
-                                                        "object_type", mode="OFF", *cobjects, **params)
 
-        animations = draw_animations + visibility_editor_animations
-
-        return animations
+        return undraw_animations
 
 class Fill(Animator):
 
@@ -66,10 +61,6 @@ class Fill(Animator):
 
         fill_animations = Animator.__new__(
             cls, "fill", "fill_type", *cobjects, **params)
-        # visibility_editor_animations = Animator.__new__(cls, "visibility_editor",
-        #                                                 "object_type", rel_cut_off=0.99, *cobjects, **params)
-
-        #animations = fill_animations + visibility_editor_animations
 
         return fill_animations
 
@@ -79,23 +70,20 @@ class UnFill(Animator):
 
         fill_animations = Animator.__new__(cls, "fill", "fill_type",
                                            transparency=1, *cobjects, **params)
-        visibility_editor_animations = Animator.__new__(cls, "visibility_editor",
-                                                        "object_type", rel_delay=0.99, mode="OFF", *cobjects, **params)
 
-        animations = fill_animations + visibility_editor_animations
-
-        return animations
+        return fill_animations
 
 class DrawThenFill(Draw, Fill):
 
     def __new__(cls, *cobjects, **params):
 
         draw_animations = Draw.__new__(cls, *cobjects, **params)
-        fill_animations = Fill.__new__(cls, rel_delay=0.3, *cobjects, **params)
+        fill_animations = Fill.__new__(cls, *cobjects, **params)
 
-        animations = draw_animations + fill_animations
+        draw_then_fill_animation_group = AnimationGroup(
+            (draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
 
-        return animations
+        return draw_then_fill_animation_group
 
 class Transform(Animator):
 

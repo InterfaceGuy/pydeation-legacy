@@ -1,5 +1,6 @@
 
 from pydeationlib.constants import *
+from pydeationlib.animation.animation import *
 import os
 import c4d.documents as c4doc
 import c4d
@@ -83,13 +84,6 @@ class Scene():
             cobject.sketch_mat = self.doc.GetFirstMaterial()
             # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
             cobject.set_sketch_mat(color=cobject.color)
-            # set to hidden at frame zero
-            desc_vis_editor = c4d.DescID(c4d.DescLevel(
-                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-            descIds = [desc_vis_editor]
-            values = [c4d.MODE_OFF]
-            self.set_values(cobject, descIds, values)
-            self.make_keyframes(cobject, descIds, time=0)
             # add spline object to kairos list
             self.kairos.append(cobject)
             # update cinema
@@ -122,13 +116,6 @@ class Scene():
             spline_object.sketch_mat = self.doc.GetFirstMaterial()
             # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
             spline_object.set_sketch_mat(color=spline_object.color)
-            # set to hidden at frame zero
-            desc_vis_editor = c4d.DescID(c4d.DescLevel(
-                c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-            descIds = [desc_vis_editor]
-            values = [c4d.MODE_OFF]
-            self.set_values(spline_object, descIds, values)
-            self.make_keyframes(spline_object, descIds, time=0)
             # add spline object to kairos list
             self.kairos.append(spline_object)
             # update cinema
@@ -401,16 +388,27 @@ class Scene():
         # remove cobjects from chronos
         self.chronos.clear()
 
-    @staticmethod
-    def flatten_animations(animations):
+    def flatten_animations(self, item_list):
         # unpacks animation groups inside tuple
         animations_list = []
-        for animation in animations:
-            if type(animation) is tuple:
+        # discern between types
+        for item in item_list:
+            # individual animation
+            if isinstance(item, Animation):
+                # simply append
+                animation = item
                 animations_list.append(animation)
-            elif type(animation) is list:
-                for anim in animation:
-                    animations_list.append(anim)
+            # animation group
+            elif isinstance(item, AnimationGroup):
+                animation_group = item
+                # unpack animations and append
+                for animation in animation_group.animations:
+                    animations_list.append(animation)
+            # list of animations/animation groups
+            elif type(item) is list:
+                item_list = item
+                # feed back into method
+                self.flatten_animations(item_list)
 
         return tuple(animations_list)
 
@@ -423,10 +421,10 @@ class Scene():
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
-            cobject, values, descIds, animation_params = animation
+            cobject, values, descIds, animation_type = animation.cobject, animation.values, animation.descIds, animation.type
             # unpack animation parameters
-            rel_delay, rel_cut_off, animation_type = animation_params
-            abs_delay = run_time * rel_delay
+            rel_start_point, rel_end_point = animation.rel_run_time
+            abs_delay = run_time * rel_start_point
 
             # check animation type
             if animation_type == "fill_type":
@@ -449,10 +447,10 @@ class Scene():
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
-            cobject, values, descIds, animation_params = animation
+            cobject, values, descIds, animation_type = animation.cobject, animation.values, animation.descIds, animation.type
             # unpack animation parameters
-            rel_delay, rel_cut_off, animation_type = animation_params
-            abs_cut_off = run_time * rel_cut_off
+            rel_start_point, rel_end_point = animation.rel_run_time
+            abs_cut_off = run_time * (1 - rel_end_point)
 
             # check animation type
             if animation_type == "fill_type":
