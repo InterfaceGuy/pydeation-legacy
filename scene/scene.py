@@ -143,31 +143,31 @@ class Scene():
                 # insert spline object under group object
                 child.parent.InsertUnder(child.group_object.obj)
 
-    def add_to_kairos(self, cobject):
+    def add_to_kairos(self, *cobjects):
         # checks whether object is in kairos and if not adds it
-
-        # check if already added
-        if (cobject in self.kairos):
-            pass
-        else:
-            # check for group
-            if cobject.ctype == "Group":
-                self.add_to_kairos_group(cobject)
-            # check for group member
-            elif hasattr(cobject, "group_object"):
-                # add group object to kairos
-                self.add_to_kairos(cobject.group_object)
-            # individual cobject
+        for cobject in cobjects:
+            # check if already added
+            if (cobject in self.kairos):
+                pass
             else:
-                # check object type
-                # cobject
-                if cobject.ctype == "CObject":
-                    # add cobject to kairos
-                    self.add_to_kairos_cobject(cobject)
-                # spline object
-                elif cobject.ctype == "SplineObject":
-                    # add spline object to kairos
-                    self.add_to_kairos_spline_object(cobject)
+                # check for group
+                if cobject.ctype == "Group":
+                    self.add_to_kairos_group(cobject)
+                # check for group member
+                elif hasattr(cobject, "group_object"):
+                    # add group object to kairos
+                    self.add_to_kairos(cobject.group_object)
+                # individual cobject
+                else:
+                    # check object type
+                    # cobject
+                    if cobject.ctype == "CObject":
+                        # add cobject to kairos
+                        self.add_to_kairos_cobject(cobject)
+                    # spline object
+                    elif cobject.ctype == "SplineObject":
+                        # add spline object to kairos
+                        self.add_to_kairos_spline_object(cobject)
 
     def finish(self):
         # set maximum time to time after last animation
@@ -185,6 +185,13 @@ class Scene():
         frame = self.get_time().GetFrame(fps)
         return frame
 
+    def set_frame(self, frame):
+        # set time using frame number
+        fps = self.doc.GetFps()
+        time = c4d.BaseTime(frame, fps)
+        self.doc.SetTime(time)
+        c4d.EventAdd()
+
     def set_time(self, time):
         if type(time) is float or type(time) is int:
             time = c4d.BaseTime(time)
@@ -193,10 +200,15 @@ class Scene():
     def get_time(self):
         return self.doc.GetTime()
 
-    def add_time(self, run_time):
+    def add_time(self, run_time, in_frames=False):
         time_ini = self.get_time()
         time_fin = time_ini + c4d.BaseTime(run_time)
         self.set_time(time_fin)
+
+    def add_frames(self, frames, in_frames=False):
+        frame_ini = self.get_frame()
+        frame_fin = frame_ini + frames
+        self.set_frame(frame_fin)
 
     def get_tracks(self, cobject, descIds):
         # get tracks from descIds
@@ -219,7 +231,6 @@ class Scene():
     @staticmethod
     def descs_to_params(descIds):
         # turns descIds into paramIds
-
         for descId in descIds:
             if len(descId) == 1:
                 # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
@@ -390,29 +401,36 @@ class Scene():
 
     def flatten_animations(self, item_list):
         # unpacks animation groups inside tuple
+
+        # define list for unpacked animations
         animations_list = []
-        # discern between types
-        for item in item_list:
-            # individual animation
-            if isinstance(item, Animation):
-                # simply append
-                animation = item
-                animations_list.append(animation)
-            # animation group
-            elif isinstance(item, AnimationGroup):
-                animation_group = item
-                # unpack animations and append
-                for animation in animation_group.animations:
-                    animations_list.append(animation)
-            # list of animations/animation groups
-            elif type(item) is list:
-                item_list = item
-                # feed back into method
-                self.flatten_animations(item_list)
+        # function for recursive application
 
-        return tuple(animations_list)
+        def process(item_list):
+            # discern between types
+            for item in item_list:
+                # individual animation
+                if isinstance(item, Animation):
+                    # simply append
+                    animations_list.append(item)
+                # animation group
+                elif isinstance(item, AnimationGroup):
+                    animation_group = item
+                    # unpack animations and append
+                    for animation in animation_group.animations:
+                        animations_list.append(animation)
+                # list of animations/animation groups
+                elif type(item) is list:
+                    item_list = item
+                    # feed back into method
+                    process(item_list)
 
-    def play(self, *animations, run_time=1):
+        # apply function
+        process(item_list)
+
+        return animations_list
+
+    def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
 
         # set initial keyframes
@@ -441,7 +459,10 @@ class Scene():
                 target, descIds, delay=abs_delay)
 
         # add run_time
-        self.add_time(run_time)
+        if in_frames:
+            self.add_frames(run_time)
+        else:
+            self.add_time(run_time)
 
         # set final keyframes
         # unpack individual animations
@@ -472,4 +493,4 @@ class Scene():
         # sets object to end state of animation without playing it
 
         fps = self.doc.GetFps()
-        self.play(*transformations, run_time=1 / fps)
+        self.play(*transformations, run_time=1, in_frames=True)

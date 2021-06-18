@@ -149,9 +149,8 @@ class CObject():
 
         values, descIds = getattr(cobject, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
-
         animation = Animation(self, descIds, values,
-                              animation_type, rel_run_time)
+                              animation_type, rel_run_time, animation_name)
 
         return animation
 

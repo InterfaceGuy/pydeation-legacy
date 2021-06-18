@@ -50,8 +50,8 @@ class UnDraw(Animator):
 
     def __new__(cls, *cobjects, **params):
 
-        draw_animations = Animator.__new__(cls, "draw", "sketch_type",
-                                           completion=0.0, *cobjects, **params)
+        undraw_animations = Animator.__new__(cls, "draw", "sketch_type",
+                                             completion=0.0, *cobjects, **params)
 
         return undraw_animations
 
@@ -89,10 +89,10 @@ class Transform(Animator):
 
     def __new__(cls, *cobjects, **params):
 
-        animations = Animator.__new__(
+        transform_animations = Animator.__new__(
             cls, "transform", "object_type", *cobjects, **params)
 
-        return animations
+        return transform_animations
 
 class ChangeParams(Animator):
 

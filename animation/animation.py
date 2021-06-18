@@ -7,7 +7,7 @@ to atomic animations using the Animator class
 
 class Animation():
 
-    def __init__(self, cobject, descIds, values, animation_type, rel_run_time):
+    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name):
         # write data to properties
         self.cobject = cobject
         self.descIds = descIds
@@ -15,6 +15,13 @@ class Animation():
         self.type = animation_type
         self.rel_run_time = rel_run_time
         self.rel_length = rel_run_time[1] - rel_run_time[0]
+        self.name = animation_name
+
+    def __str__(self):
+
+        string = f"{self.name} acting on {self.cobject}"
+
+        return string
 
     def rescale_run_time(self, super_rel_run_time):
         # rescale run time by superordinate relative run time
