@@ -271,10 +271,16 @@ class Scene():
         # add keys and set values
         for curve, value in zip(curves, values):
             key = curve.AddKey(time)["key"]
+            # set interpolation type
+            key.SetInterpolation(curve, c4d.CINTERPOLATION_SPLINE)
+            key.SetTimeRight(curve, c4d.BaseTime(0.25))
+            key.SetTimeLeft(curve, c4d.BaseTime(-0.25))
             if type(value) == int:
                 key.SetGeData(curve, value)
             elif type(value) == float:
                 key.SetValue(curve, value)
+                key.SetValueRight(curve, 0)
+                key.SetValueLeft(curve, 0)
             else:
                 raise TypeError("value type must be int or float")
 

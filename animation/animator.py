@@ -68,10 +68,10 @@ class UnFill(Animator):
 
     def __new__(cls, *cobjects, **params):
 
-        fill_animations = Animator.__new__(cls, "fill", "fill_type",
-                                           transparency=1, *cobjects, **params)
+        unfill_animations = Animator.__new__(cls, "fill", "fill_type",
+                                             transparency=1, *cobjects, **params)
 
-        return fill_animations
+        return unfill_animations
 
 class DrawThenFill(Draw, Fill):
 
