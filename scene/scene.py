@@ -1,6 +1,7 @@
 
 from pydeationlib.constants import *
 from pydeationlib.animation.animator import *
+from pydeationlib.camera.camera import *
 import os
 import c4d.documents as c4doc
 import c4d
@@ -61,6 +62,14 @@ class Scene():
         self.kairos = []
         self.chronos = []
 
+        # add camera
+        self.add_to_kairos(self.camera)
+        # set view to camera
+        # get basedraw of scene
+        bd = self.doc.GetActiveBaseDraw()
+        # set camera of basedraw to scene camera
+        bd.SetSceneCamera(self.camera.obj)
+
     def add_to_kairos_cobject(self, cobject):
         # handles kairos for cobjects
 
@@ -84,7 +93,7 @@ class Scene():
             cobject.sketch_mat = self.doc.GetFirstMaterial()
             # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
             cobject.set_sketch_mat(color=cobject.color)
-            # add spline object to kairos list
+            # add cobject to kairos list
             self.kairos.append(cobject)
             # update cinema
             c4d.EventAdd()
@@ -118,6 +127,20 @@ class Scene():
             spline_object.set_sketch_mat(color=spline_object.color)
             # add spline object to kairos list
             self.kairos.append(spline_object)
+            # update cinema
+            c4d.EventAdd()
+
+    def add_to_kairos_camera(self, camera):
+        # handles kairos for cobjects
+
+        # check if already in kairos
+        if (camera in self.kairos):
+            pass
+        else:
+            # add object to kairos
+            self.doc.InsertObject(camera.obj)
+            # add camera to kairos list
+            self.kairos.append(camera)
             # update cinema
             c4d.EventAdd()
 
@@ -168,6 +191,10 @@ class Scene():
                     elif cobject.ctype == "SplineObject":
                         # add spline object to kairos
                         self.add_to_kairos_spline_object(cobject)
+                    # camera object
+                    elif cobject.ctype == "Camera":
+                        # add spline object to kairos
+                        self.add_to_kairos_camera(cobject)
 
     def finish(self):
         # set maximum time to time after last animation
@@ -453,3 +480,10 @@ class Scene():
 
         fps = self.doc.GetFps()
         self.play(*transformations, run_time=1, in_frames=True)
+
+class TwoDScene(Scene):
+
+    def __init__(self, project_name):
+        # define 2d camera
+        self.camera = TwoDCamera()
+        super(TwoDScene, self).__init__(project_name)
