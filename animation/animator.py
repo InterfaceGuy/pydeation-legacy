@@ -85,6 +85,18 @@ class DrawThenFill(Draw, Fill):
 
         return draw_then_fill_animation_group
 
+class UnDrawThenUnFill(Draw, Fill):
+
+    def __new__(cls, *cobjects, **params):
+
+        undraw_animations = UnDraw.__new__(cls, *cobjects, **params)
+        unfill_animations = UnFill.__new__(cls, *cobjects, **params)
+
+        undraw_then_unfill_animation_group = AnimationGroup(
+            (undraw_animations, (0, 0.6)), (unfill_animations, (0.3, 1)))
+
+        return undraw_then_unfill_animation_group
+
 class Transform(Animator):
 
     def __new__(cls, *cobjects, **params):

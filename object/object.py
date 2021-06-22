@@ -267,10 +267,76 @@ class SplineObject(CObject):
     }
 
     def __init__(self, color=BLUE):
+            # set orientation to XZ plane
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
+        # create parent loft for filler material
         self.parent = c4d.BaseObject(c4d.Oloft)
+        # name loft after spline child
         self.parent.SetName(self.obj.GetName())
+        # execute CObject init
         super(SplineObject, self).__init__(color=color)
+
+class OpenSpline(CObject):
+
+    def __init__(self, points, spline_type="linear", color=BLUE):
+        # convert into c4d vectors
+        point_vectors = []
+        for point in points:
+            point_vector = c4d.Vector(*point)
+            point_vectors.append(point_vector)
+
+        # create object
+        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
+        # set points
+        self.obj.SetAllPoints(point_vectors)
+        # set interpolation
+        if spline_type == "linear":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
+        elif spline_type == "cubic":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
+        elif spline_type == "akima":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
+        elif spline_type == "b-spline":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
+        elif spline_type == "bezier":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
+
+        # set spline to open
+        self.obj[c4d.SPLINEOBJECT_CLOSED] = False
+
+        # execute CObject init
+        super(OpenSpline, self).__init__(color=color)
+
+class ClosedSpline(SplineObject):
+
+    def __init__(self, points, spline_type="linear", color=BLUE):
+        # convert into c4d vectors
+        point_vectors = []
+        for point in points:
+            point_vector = c4d.Vector(*point)
+            point_vectors.append(point_vector)
+
+        # create object
+        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
+        # set points
+        self.obj.SetAllPoints(point_vectors)
+        # set interpolation
+        if spline_type == "linear":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
+        elif spline_type == "cubic":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
+        elif spline_type == "akima":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
+        elif spline_type == "b-spline":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
+        elif spline_type == "bezier":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
+
+        # set spline to closed
+        self.obj[c4d.SPLINEOBJECT_CLOSED] = True
+
+        # execute CObject init
+        super(ClosedSpline, self).__init__(color=color)
 
 class Rectangle(SplineObject):
 

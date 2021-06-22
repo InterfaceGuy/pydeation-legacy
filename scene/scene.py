@@ -1,6 +1,6 @@
 
 from pydeationlib.constants import *
-from pydeationlib.animation.animation import *
+from pydeationlib.animation.animator import *
 import os
 import c4d.documents as c4doc
 import c4d
@@ -330,73 +330,16 @@ class Scene():
     def wait(self, time=1):
         self.add_time(time)
 
-    def show(self, *cobjects):
-        # inserts cobjects into scene at given point in time
-
-        desc_vis_editor = c4d.DescID(c4d.DescLevel(
-            c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-        desc_vis_render = c4d.DescID(c4d.DescLevel(
-            c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
-
-        descIds = [desc_vis_editor, desc_vis_render]
-
-        values = [c4d.MODE_ON, c4d.MODE_ON]
-
-        for cobject in cobjects:
-            # check whether cobject is group
-            if hasattr(cobject, "children"):
-                # add children to scene
-                for child in cobject.children:
-                    # add child to kairos
-                    self.add_to_kairos(child)
-                    # set visibility
-                    self.set_values(child, descIds, values)
-                    # insert child under group
-                    child.obj.InsertUnder(cobject.obj)
-                    # keyframe visibility
-                    self.make_keyframes(child, descIds)
-                    # add children to chronos
-                    self.chronos.append(child)
-            # add cobject to kairos
-            self.add_to_kairos(cobject)
-            # set visibility
-            self.set_values(cobject, descIds, values)
-            # keyfrme visibility
-            self.make_keyframes(cobject, descIds)
-            # add cobjects to chronos
-            self.chronos.append(cobject)
+    def show(self, *cobjects, fill=False):
+        # shows cobjects at given point in time
+        if fill:
+            self.set(DrawThenFill(*cobjects))
+        else:
+            self.set(Draw(*cobjects))
 
     def hide(self, *cobjects):
-        # inserts cobjects into scene at given point in time
-
-        desc_vis_editor = c4d.DescID(c4d.DescLevel(
-            c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0))
-        desc_vis_render = c4d.DescID(c4d.DescLevel(
-            c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
-
-        descIds = [desc_vis_editor, desc_vis_render]
-
-        values = [c4d.MODE_OFF, c4d.MODE_OFF]
-
-        for cobject in cobjects:
-            # check whether cobject is group
-            if hasattr(cobject, "children"):
-                # add children to scene
-                for child in cobject.children:
-                    # set visibility
-                    self.set_values(child, descIds, values)
-                    # insert child under group
-                    child.obj.InsertUnder(cobject.obj)
-                    # keyframe visibility
-                    self.make_keyframes(child, descIds)
-                    # add children to chronos
-                    self.chronos.append(child)
-            # set visibility
-            self.set_values(cobject, descIds, values)
-            # keyfrme visibility
-            self.make_keyframes(cobject, descIds)
-            # add cobjects to chronos
-            self.chronos.append(cobject)
+        # hides cobjects at given point in time
+        self.set(UnDrawThenUnFill(*cobjects))
 
     def clear(self):
         # removes all cobjects from scene at given point in time
@@ -448,7 +391,12 @@ class Scene():
             cobject, values, descIds, animation_type = animation.cobject, animation.values, animation.descIds, animation.type
             # unpack animation parameters
             rel_start_point, rel_end_point = animation.rel_run_time
-            abs_delay = run_time * rel_start_point
+            # calculate absolute delay
+            fps = self.doc.GetFps()
+            if in_frames:
+                abs_delay = run_time / fps * rel_start_point
+            else:
+                abs_delay = run_time * rel_start_point
 
             # check animation type
             if animation_type == "fill_type":
@@ -477,7 +425,12 @@ class Scene():
             cobject, values, descIds, animation_type = animation.cobject, animation.values, animation.descIds, animation.type
             # unpack animation parameters
             rel_start_point, rel_end_point = animation.rel_run_time
-            abs_cut_off = run_time * (1 - rel_end_point)
+            # calculate absolute delay
+            fps = self.doc.GetFps()
+            if in_frames:
+                abs_cut_off = run_time / fps * (1 - rel_end_point)
+            else:
+                abs_cut_off = run_time * (1 - rel_end_point)
 
             # check animation type
             if animation_type == "fill_type":
