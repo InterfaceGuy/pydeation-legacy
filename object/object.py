@@ -1,5 +1,6 @@
 import c4d
 from pydeationlib.constants import *
+from pydeationlib.animation.animation import Animation
 
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
@@ -36,9 +37,9 @@ class CObject():
         "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "draw_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
-        "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0))
-        "vis_editor" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
-        "vis_render" = c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+        "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
+        "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
+        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
     def __init__(self, color=BLUE):
 
@@ -51,6 +52,11 @@ class CObject():
         self.filler_tag = c4d.BaseTag(c4d.Ttexture)  # filler tag
         # assign material to tag
         self.filler_tag.SetMaterial(self.filler_mat)
+
+        # create container for sketch material - CHANGE AFTER REPLACING WORKAROUND
+        self.sketch_mat = None
+        # create tag
+        self.sketch_tag = None
 
         # set universal default params
         self.color = color
@@ -71,6 +77,7 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
+        self.filler_mat[c4d.MATERIAL_DISPLAY_USE_LUMINANCE] = False
 
     def set_sketch_mat(self, color=BLUE):
         # sets params of filler mat as a function of color
@@ -79,7 +86,7 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = 3
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
-        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = True
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = False
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_AUTODRAW] = True
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
@@ -116,29 +123,34 @@ class CObject():
 
         return paramIds
 
-    def get_current_values(self, descIds):
+    def get_current_values(self, descIds, mode=None):
         # reads out current values from descIds
 
         # get paramIds from descIds
         paramIds = self.descs_to_params(descIds)
         # determine current values
-        curr_values = [self.obj[paramId] for paramId in paramIds]
+        if mode == "fill":
+            curr_values = [self.filler_mat[paramId] for paramId in paramIds]
+        elif mode == "sketch":
+            curr_values = [self.sketch_mat[paramId] for paramId in paramIds]
+        else:
+            curr_values = [self.obj[paramId] for paramId in paramIds]
 
         return curr_values
 
-    def animate(self, cobject, animation_name, rel_delay=0, rel_cut_off=0, **params):
+    def animate(self, cobject, animation_name, animation_type, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
-        if rel_delay < 0 or rel_delay > 1:
+        if rel_start_point < 0 or rel_start_point > 1:
             raise ValueError("relative delay must be between 0-1!")
-        if rel_cut_off < 0 or rel_cut_off > 1:
+        if rel_end_point < 0 or rel_end_point > 1:
             raise ValueError("relative cut off must be between 0-1!")
 
-        animation_data = getattr(cobject, animation_name)(**params)
-        animation_params = [rel_delay, rel_cut_off]
-
-        animation = (*animation_data, animation_params)
+        values, descIds = getattr(cobject, animation_name)(**params)
+        rel_run_time = (rel_start_point, rel_end_point)
+        animation = Animation(self, descIds, values,
+                              animation_type, rel_run_time, animation_name)
 
         return animation
 
@@ -147,15 +159,15 @@ class CObject():
 
         # gather descIds
         descIds = [
-            self.descIds["pos_x"],
-            self.descIds["pos_y"],
-            self.descIds["pos_z"],
-            self.descIds["rot_h"],
-            self.descIds["rot_p"],
-            self.descIds["rot_b"],
-            self.descIds["scale_x"],
-            self.descIds["scale_y"],
-            self.descIds["scale_z"]
+            CObject.descIds["pos_x"],
+            CObject.descIds["pos_y"],
+            CObject.descIds["pos_z"],
+            CObject.descIds["rot_h"],
+            CObject.descIds["rot_p"],
+            CObject.descIds["rot_b"],
+            CObject.descIds["scale_x"],
+            CObject.descIds["scale_y"],
+            CObject.descIds["scale_z"]
         ]
 
         # determine default and input values
@@ -184,29 +196,46 @@ class CObject():
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
-    def draw(self, completion=1.0):
-        # draw contours
+    def visibility_editor(self, mode="ON"):
+        # toggle visibility in editor
+        # not used anymore!
 
         # gather descIds
-        descIds = [self.descIds["draw_completion"], self.descIds["vis_editor"]]
+        descIds = [CObject.descIds["vis_editor"]]
+
+        # convert parameters
+        if mode == "ON":
+            vis_editor = c4d.MODE_ON
+        elif mode == "OFF":
+            vis_editor = c4d.MODE_OFF
 
         # determine default and input values
-        # convert parameters
-        if completion == 0.0:
-            vis_editor = False
-        else:
-            vis_editor = True
-
-        input_values = [completion, vis_editor]
+        input_values = [vis_editor]
         default_values = self.get_current_values(descIds)
 
         # filter out unchanged variables
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self.sketch_mat, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
+
+    def draw(self, completion=1.0):
+        # draw contours
+
+        # gather descIds
+        descIds = [CObject.descIds["draw_completion"]]
+
+        # determine default and input values
+        input_values = [completion]
+        default_values = self.get_current_values(descIds, mode="sketch")
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (values_filtered, descIds_filtered)
 
     def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
         # shifts transparency of filler material
@@ -215,10 +244,10 @@ class CObject():
         if solid:
             transparency = 0
 
-        descIds = [self.descIds["filler_transparency"]]
+        descIds = [CObject.descIds["filler_transparency"]]
         values = [transparency]
 
-        return (self.filler_mat, values, descIds)
+        return (values, descIds)
 
 
 class SplineObject(CObject):
@@ -238,10 +267,76 @@ class SplineObject(CObject):
     }
 
     def __init__(self, color=BLUE):
+            # set orientation to XZ plane
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
+        # create parent loft for filler material
         self.parent = c4d.BaseObject(c4d.Oloft)
+        # name loft after spline child
         self.parent.SetName(self.obj.GetName())
+        # execute CObject init
         super(SplineObject, self).__init__(color=color)
+
+class OpenSpline(CObject):
+
+    def __init__(self, points, spline_type="linear", color=BLUE):
+        # convert into c4d vectors
+        point_vectors = []
+        for point in points:
+            point_vector = c4d.Vector(*point)
+            point_vectors.append(point_vector)
+
+        # create object
+        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
+        # set points
+        self.obj.SetAllPoints(point_vectors)
+        # set interpolation
+        if spline_type == "linear":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
+        elif spline_type == "cubic":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
+        elif spline_type == "akima":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
+        elif spline_type == "b-spline":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
+        elif spline_type == "bezier":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
+
+        # set spline to open
+        self.obj[c4d.SPLINEOBJECT_CLOSED] = False
+
+        # execute CObject init
+        super(OpenSpline, self).__init__(color=color)
+
+class ClosedSpline(SplineObject):
+
+    def __init__(self, points, spline_type="linear", color=BLUE):
+        # convert into c4d vectors
+        point_vectors = []
+        for point in points:
+            point_vector = c4d.Vector(*point)
+            point_vectors.append(point_vector)
+
+        # create object
+        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
+        # set points
+        self.obj.SetAllPoints(point_vectors)
+        # set interpolation
+        if spline_type == "linear":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
+        elif spline_type == "cubic":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
+        elif spline_type == "akima":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
+        elif spline_type == "b-spline":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
+        elif spline_type == "bezier":
+            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
+
+        # set spline to closed
+        self.obj[c4d.SPLINEOBJECT_CLOSED] = True
+
+        # execute CObject init
+        super(ClosedSpline, self).__init__(color=color)
 
 class Rectangle(SplineObject):
 
@@ -288,7 +383,7 @@ class Rectangle(SplineObject):
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
 class Circle(SplineObject):
 
@@ -349,7 +444,7 @@ class Circle(SplineObject):
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
 
-        return (self, values_filtered, descIds_filtered)
+        return (values_filtered, descIds_filtered)
 
 class Sphere(CObject):
 
@@ -406,3 +501,5 @@ class Group(CObject):
         # add cobjects as children
         for cobject in cobjects:
             self.children.append(cobject)
+            # mark children as group member
+            cobject.group_object = self

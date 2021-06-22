@@ -1,67 +1,82 @@
+"""
+the Animation class provides a useful and versatile data structure for passing, manipulating and interpreting animations
+
+instances of this class will be passed by the animation quarks (CObject methods) which in turn will be (recursively) combined
+to atomic animations using the Animator class
+"""
+
 class Animation():
-    """
-    abstract class for animations
-    takes in cobjects and groups and returns animations to pass to play() method
-    """
 
-    def __new__(cls, animation_name, *cobjects, **params):
-        # calss animation method of cobjects and passes params
+    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name):
+        # write data to properties
+        self.cobject = cobject
+        self.descIds = descIds
+        self.values = values
+        self.type = animation_type
+        self.rel_run_time = rel_run_time
+        self.rel_length = rel_run_time[1] - rel_run_time[0]
+        self.name = animation_name
 
-        animations = []
-        # flatten input in case of groups
-        flattened_cobjects = cls.flatten_input(cobjects)
-        # gather animations
-        for cobject in flattened_cobjects:
-            animation = getattr(cobject, "animate")(
-                cobject, animation_name, **params)
-            animations.append(animation)
+    def __str__(self):
 
-        return animations
+        string = f"{self.name} acting on {self.cobject}"
 
-    @staticmethod
-    def flatten_input(cobjects):
-        # checks for groups and flattens list
+        return string
 
-        flattened_cobjects = []
+    def rescale_run_time(self, super_rel_run_time):
+        # rescale run time by superordinate relative run time
 
-        for cobject in cobjects:
-            if hasattr(cobject, "children"):
-                for child in cobject.children:
-                    flattened_cobjects.append(child)
-                continue
-            flattened_cobjects.append(cobject)
+        # get start and endpoint of superordinate relative run time
+        super_rel_start_point = super_rel_run_time[0]
+        super_rel_end_point = super_rel_run_time[1]
+        # get length of superordinate relative run time
+        super_rel_run_time_length = super_rel_end_point - super_rel_start_point
+        # rescale run time
+        rel_run_time_rescaled = tuple(
+            [super_rel_run_time_length * x for x in self.rel_run_time])
+        # translate run time
+        rel_run_time_rescaled_translated = tuple(
+            [x + super_rel_start_point for x in rel_run_time_rescaled])
+        # write to animation
+        self.rel_run_time = rel_run_time_rescaled_translated
 
-        return flattened_cobjects
+class AnimationGroup():
 
+    def __init__(self, *rel_animations_tuples):
 
-class Draw(Animation):
+        # read in data
+        self.rel_animations_tuples = rel_animations_tuples
+        # rescale run times and save rescaled animations
+        self.animations = self.rescale_run_times()
 
-    def __new__(cls, *cobjects, **params):
+    def rescale_run_times(self):
+        # rescale animation run times
 
-        animations = super().__new__(cls, "draw", *cobjects, **params)
+        rescaled_animations = []
+        # unpack relative animations tuples
+        for animations, rel_run_time in self.rel_animations_tuples:
+            # unpack animations
+            for animation in animations:
+                # rescale animation run time with run time from tuple
+                animation.rescale_run_time(rel_run_time)
+                # append rescaled animations
+                rescaled_animations.append(animation)
 
-        return animations
+        return rescaled_animations
 
-class Fill(Animation):
+    @classmethod
+    def combine(cls, *rel_animation_group_tuples):
+        # combines animation groups into new animation group
 
-    def __new__(cls, *cobjects, **params):
+        # new relative animation tuples
+        rel_animations_tuples = []
 
-        animations = super().__new__(cls, "fill", *cobjects, **params)
+        # unpack tuples
+        for animation_group, rel_run_time in rel_animation_group_tuples:
+            # read out animations
+            animations = animation_group.rescaled_animations
+            # write to relative animations tuples
+            rel_animations_tuple = (animation, rel_run_time)
+            rel_animations_tuples.append(rel_animations_tuple)
 
-        return animations
-
-class Transform(Animation):
-
-    def __new__(cls, *cobjects, **params):
-
-        animations = super().__new__(cls, "transform", *cobjects, **params)
-
-        return animations
-
-class ChangeParams(Animation):
-
-    def __new__(cls, *cobjects, **params):
-
-        animations = super().__new__(cls, "change_params", *cobjects, **params)
-
-        return animations
+        return cls(rel_animations_tuples)
