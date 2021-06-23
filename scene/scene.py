@@ -483,6 +483,12 @@ class Scene():
         fps = self.doc.GetFps()
         self.play(*transformations, run_time=1, in_frames=True)
 
+    def zoom(self, zoom, run_time=1, smoothing=0.25):
+        # animates zoom of currently active camera
+
+        self.play(ChangeParams(self.camera, zoom=zoom,
+                               smoothing=smoothing), run_time)
+
 class TwoDScene(Scene):
 
     def __init__(self, project_name):
