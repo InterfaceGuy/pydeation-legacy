@@ -7,15 +7,16 @@ to atomic animations using the Animator class
 
 class Animation():
 
-    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name):
+    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name, smoothing):
         # write data to properties
         self.cobject = cobject
         self.descIds = descIds
         self.values = values
         self.type = animation_type
         self.rel_run_time = rel_run_time
-        self.rel_length = rel_run_time[1] - rel_run_time[0]
+        self.rel_duration = rel_run_time[1] - rel_run_time[0]
         self.name = animation_name
+        self.smoothing = smoothing
 
     def __str__(self):
 

@@ -138,7 +138,7 @@ class CObject():
 
         return curr_values
 
-    def animate(self, cobject, animation_name, animation_type, rel_start_point=0, rel_end_point=1, **params):
+    def animate(self, cobject, animation_name, animation_type, smoothing, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -150,7 +150,7 @@ class CObject():
         values, descIds = getattr(cobject, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
         animation = Animation(self, descIds, values,
-                              animation_type, rel_run_time, animation_name)
+                              animation_type, rel_run_time, animation_name, smoothing)
 
         return animation
 
