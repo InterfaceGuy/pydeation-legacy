@@ -7,7 +7,7 @@ class Animator():
     takes in cobjects and groups and returns animations to pass to play() method
     """
 
-    def __new__(cls, animation_name, animation_type, smoothing, *cobjects, **params):
+    def __new__(cls, animation_name, animation_type, *cobjects, **params):
         # calss animation method of cobjects and passes params
 
         animations = []
