@@ -7,7 +7,7 @@ to atomic animations using the Animator class
 
 class Animation():
 
-    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name, smoothing):
+    def __init__(self, cobject, descIds, values, animation_type, rel_run_time, animation_name, smoothing=0.25):
         # write data to properties
         self.cobject = cobject
         self.descIds = descIds

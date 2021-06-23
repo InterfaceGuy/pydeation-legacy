@@ -41,7 +41,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, x=0, y=0, z=0, scale=1):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -61,6 +61,14 @@ class CObject():
         # set universal default params
         self.color = color
         self.set_filler_mat(color=self.color)
+        # position
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_X] = x
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = y
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Z] = z
+        # scale
+        self.obj[c4d.ID_BASEOBJECT_REL_SCALE,c4d.VECTOR_X] = scale
+        self.obj[c4d.ID_BASEOBJECT_REL_SCALE,c4d.VECTOR_Y] = scale
+        self.obj[c4d.ID_BASEOBJECT_REL_SCALE,c4d.VECTOR_Z] = scale
         # because of workaround set_sketch_mat() is called in add_to_kairos()
 
     def __str__(self):
@@ -138,7 +146,7 @@ class CObject():
 
         return curr_values
 
-    def animate(self, cobject, animation_name, animation_type, smoothing, rel_start_point=0, rel_end_point=1, **params):
+    def animate(self, cobject, animation_name, animation_type, smoothing=0.25, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -266,7 +274,7 @@ class SplineObject(CObject):
         "plane": c4d.DescID(c4d.DescLevel(c4d.PRIM_PLANE, c4d.DTYPE_LONG, 0))
     }
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
             # set orientation to XZ plane
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
         # create parent loft for filler material
@@ -274,11 +282,11 @@ class SplineObject(CObject):
         # name loft after spline child
         self.parent.SetName(self.obj.GetName())
         # execute CObject init
-        super(SplineObject, self).__init__(color=color)
+        super(SplineObject, self).__init__(color=color, **params)
 
 class OpenSpline(CObject):
 
-    def __init__(self, points, spline_type="linear", color=BLUE):
+    def __init__(self, points, spline_type="linear", color=BLUE, **params):
         # convert into c4d vectors
         point_vectors = []
         for point in points:
@@ -305,11 +313,11 @@ class OpenSpline(CObject):
         self.obj[c4d.SPLINEOBJECT_CLOSED] = False
 
         # execute CObject init
-        super(OpenSpline, self).__init__(color=color)
+        super(OpenSpline, self).__init__(color=color, **params)
 
 class ClosedSpline(SplineObject):
 
-    def __init__(self, points, spline_type="linear", color=BLUE):
+    def __init__(self, points, spline_type="linear", color=BLUE, **params):
         # convert into c4d vectors
         point_vectors = []
         for point in points:
@@ -336,18 +344,18 @@ class ClosedSpline(SplineObject):
         self.obj[c4d.SPLINEOBJECT_CLOSED] = True
 
         # execute CObject init
-        super(ClosedSpline, self).__init__(color=color)
+        super(ClosedSpline, self).__init__(color=color, **params)
 
 class Rectangle(SplineObject):
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinerectangle)
         # set ideosynchratic default params
         self.obj[c4d.PRIM_RECTANGLE_ROUNDING] = True
         self.obj[c4d.PRIM_RECTANGLE_RADIUS] = 0
         # run universal initialisation
-        super(Rectangle, self).__init__(color=color)
+        super(Rectangle, self).__init__(color=color, **params)
 
     def change_params(self, width=400.0, height=400.0, rounding=0.0, plane="XZ"):
 
@@ -390,7 +398,7 @@ class Circle(SplineObject):
     RADIUS_X = 200
     RADIUS_Y = 200
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinecircle)
         # set ideosynchratic default params
@@ -398,7 +406,7 @@ class Circle(SplineObject):
         self.obj[c4d.PRIM_CIRCLE_RING] = True
         self.obj[c4d.PRIM_CIRCLE_INNER] = self.obj[c4d.PRIM_CIRCLE_RADIUS]
         # run universal initialisation
-        super(Circle, self).__init__(color=color)
+        super(Circle, self).__init__(color=color, **params)
 
     def change_params(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ"):
 
@@ -448,29 +456,29 @@ class Circle(SplineObject):
 
 class Sphere(CObject):
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osphere)
         # set ideosynchratic default params
 
         # run universal initialisation
-        super(Sphere, self).__init__(color=color)
+        super(Sphere, self).__init__(color=color, **params)
 
 
 class Cube(CObject):
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Ocube)
         # set ideosynchratic default params
 
         # run universal initialisation
-        super(Cube, self).__init__(color=color)
+        super(Cube, self).__init__(color=color, **params)
 
 
 class Cylinder(CObject):
 
-    def __init__(self, color=BLUE):
+    def __init__(self, color=BLUE, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Ocylinder)
 
@@ -480,7 +488,7 @@ class Cylinder(CObject):
         self.obj[c4d.PRIM_AXIS] = 4
 
         # run universal initialisation
-        super(Cylinder, self).__init__(color=color)
+        super(Cylinder, self).__init__(color=color, **params)
 
 
 class Group(CObject):

@@ -4,3 +4,8 @@ this way we just have to include "from pydeationlib.imports import *" in our scr
 """
 
 from pydeationlib.scene.scene import *
+from pydeationlib.constants import *
+from pydeationlib.object.object import *
+from pydeationlib.camera.camera import *
+from pydeationlib.animation.animator import *
+from c4d.utils import *
