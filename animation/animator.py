@@ -1,4 +1,5 @@
 from pydeationlib.animation.animation import *
+import c4d
 
 
 class Animator():
@@ -73,6 +74,39 @@ class UnFill(Animator):
 
         return unfill_animations
 
+class Fade(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        fade_animations = Animator.__new__(
+            cls, "fade", "sketch_type", *cobjects, **params)
+
+        return fade_animations
+
+class FadeIn(Fade):
+
+    def __new__(cls, *cobjects, **params):
+
+        # set initial conditions
+        for cobject in cobjects:
+            # draw completion
+            cobject.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 1
+            # transparency
+            cobject.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 0
+
+        fadein_animation = Fade.__new__(cls, opacity=1.0, *cobjects, **params)
+
+        return fadein_animation
+
+class FadeOut(Fade):
+
+    def __new__(cls, *cobjects, **params):
+
+        fadeout_animations = Fade.__new__(
+            cls, opacity=0.0, *cobjects, **params)
+
+        return fadeout_animations
+
 class DrawThenFill(Draw, Fill):
 
     def __new__(cls, *cobjects, **params):
@@ -85,7 +119,20 @@ class DrawThenFill(Draw, Fill):
 
         return draw_then_fill_animation_group
 
-class UnDrawThenUnFill(Draw, Fill):
+class DrawThenFillCompletely(Draw, Fill):
+
+    def __new__(cls, *cobjects, **params):
+
+        draw_animations = Draw.__new__(cls, *cobjects, **params)
+        fill_animations = Fill.__new__(
+            cls, solid=True, *cobjects, **params)
+
+        draw_then_fill_animation_group = AnimationGroup(
+            (draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
+
+        return draw_then_fill_animation_group
+
+class UnDrawThenUnFill(UnDraw, UnFill):
 
     def __new__(cls, *cobjects, **params):
 
@@ -97,7 +144,7 @@ class UnDrawThenUnFill(Draw, Fill):
 
         return undraw_then_unfill_animation_group
 
-class UnFillThenUnDraw(Draw, Fill):
+class UnFillThenUnDraw(UnDraw, UnFill):
 
     def __new__(cls, *cobjects, **params):
 
@@ -108,6 +155,18 @@ class UnFillThenUnDraw(Draw, Fill):
             (unfill_animations, (0, 0.6)), (undraw_animations, (0.3, 1)))
 
         return unfill_then_undraw_animation_group
+
+class DrawThenUnDraw(Draw, UnDraw):
+
+    def __new__(cls, *cobjects, **params):
+
+        draw_animations = Draw.__new__(cls, *cobjects, **params)
+        undraw_animations = UnDraw.__new__(cls, *cobjects, **params)
+
+        draw_then_undraw_animation_group = AnimationGroup(
+            (draw_animations, (0, 0.5)), (undraw_animations, (0.6, 1)))
+
+        return draw_then_undraw_animation_group
 
 class Transform(Animator):
 
