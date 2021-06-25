@@ -42,7 +42,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, color=BLUE):
+    def __init__(self, x=0, y=0, z=0, scale=1, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -62,14 +62,18 @@ class CObject():
         # set universal default params
         self.color = color
         self.set_filler_mat(color=self.color)
-        # position
-        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_X] = x
-        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = y
-        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Z] = z
-        # scale
-        self.obj[c4d.ID_BASEOBJECT_REL_SCALE, c4d.VECTOR_X] = scale
-        self.obj[c4d.ID_BASEOBJECT_REL_SCALE, c4d.VECTOR_Y] = scale
-        self.obj[c4d.ID_BASEOBJECT_REL_SCALE, c4d.VECTOR_Z] = scale
+
+        # set initial parameters
+        # transform
+        self.set_initial_params_object(self.transform(
+            x=x, y=y, z=z, scale=scale, h=h, p=p, b=b))
+        # fill
+        self.set_initial_params_filler_material(
+            self.fill(transparency=transparency, solid=solid))
+        # draw
+        # self.set_initial_params_sketch_material(
+        #   self.draw(completion=completion))
+
         # because of workaround set_sketch_mat() is called in add_to_kairos()
 
     def __str__(self):
@@ -123,6 +127,8 @@ class CObject():
     def descs_to_params(descIds):
         # turns descIds into paramIds
 
+        if len(descIds) == 0:
+            return []
         for descId in descIds:
             if len(descId) == 1:
                 # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
@@ -165,6 +171,45 @@ class CObject():
                               animation_type, rel_run_time, animation_name, smoothing)
 
         return animation
+
+    def set_initial_params_object(self, animation_method):
+        # this method takes in the values and descIds from the animation methods and translates them to just change the initial parameters
+
+        # read out values and descIds
+        values, descIds = animation_method
+        # convert descIds to paramIds
+        paramIds = self.descs_to_params(descIds)
+        # set values
+        for value, paramId in zip(values, paramIds):
+            self.obj[paramId] = value
+
+    def set_initial_params_filler_material(self, animation_method):
+        # this method takes in the values and descIds from the animation methods and translates them to just change the initial parameters
+
+        # read out values and descIds
+        values, descIds = animation_method
+        # convert descIds to paramIds
+        paramIds = self.descs_to_params(descIds)
+        # skip if no values changed
+        if paramIds is None:
+            return
+        # set values
+        for value, paramId in zip(values, paramIds):
+            self.filler_mat[paramId] = value
+
+    def set_initial_params_sketch_material(self, animation_method):
+        # this method takes in the values and descIds from the animation methods and translates them to just change the initial parameters
+
+        # read out values and descIds
+        values, descIds = animation_method
+        # convert descIds to paramIds
+        paramIds = self.descs_to_params(descIds)
+        # skip if no values changed
+        if paramIds is None:
+            return
+        # set values
+        for value, paramId in zip(values, paramIds):
+            self.sketch_mat[paramId] = value
 
     def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, relative=True):
         # transforms the objects position, rotation, scale
@@ -376,12 +421,15 @@ class ClosedSpline(SplineObject):
 
 class Rectangle(SplineObject):
 
-    def __init__(self, **params):
+    def __init__(self, width=400.0, height=400.0, rounding=0.0, plane="XZ", **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinerectangle)
         # set ideosynchratic default params
         self.obj[c4d.PRIM_RECTANGLE_ROUNDING] = True
         self.obj[c4d.PRIM_RECTANGLE_RADIUS] = 0
+        # set initial paramaters
+        self.set_initial_params_object(self.change_params(
+            width=width, height=height, rounding=rounding, plane=plane))
         # run universal initialisation
         super(Rectangle, self).__init__(**params)
 
@@ -426,13 +474,16 @@ class Circle(SplineObject):
     RADIUS_X = 200
     RADIUS_Y = 200
 
-    def __init__(self, **params):
+    def __init__(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ", **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinecircle)
         # set ideosynchratic default params
         self.obj[c4d.PRIM_CIRCLE_ELLIPSE] = True
         self.obj[c4d.PRIM_CIRCLE_RING] = True
         self.obj[c4d.PRIM_CIRCLE_INNER] = self.obj[c4d.PRIM_CIRCLE_RADIUS]
+        # set initial paramaters
+        self.set_initial_params_object(self.change_params(
+            ellipse_ratio=ellipse_ratio, ellipse_axis=ellipse_axis, ring_ratio=ring_ratio, plane=plane))
         # run universal initialisation
         super(Circle, self).__init__(**params)
 
