@@ -32,6 +32,9 @@ class Scene():
         try:  # check if folder already exists
             os.mkdir(self.scene_path)
             print("path successfully created")
+        except FileNotFoundError:
+            print(self.scene_name + " is being run as imported scene")
+            pass
         except FileExistsError:
             pass
 
@@ -69,6 +72,16 @@ class Scene():
         bd = self.doc.GetActiveBaseDraw()
         # set camera of basedraw to scene camera
         bd.SetSceneCamera(self.camera.obj)
+
+    def finish(self):
+        # set maximum time to time after last animation
+        self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
+        # set time to frame 0
+        self.set_time(0)
+        # save the scene to project file
+        c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
+                          c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
+        c4d.EventAdd()
 
     def add_to_kairos_cobject(self, cobject):
         # handles kairos for cobjects
@@ -195,16 +208,6 @@ class Scene():
                     elif cobject.ctype == "Camera":
                         # add spline object to kairos
                         self.add_to_kairos_camera(cobject)
-
-    def finish(self):
-        # set maximum time to time after last animation
-        self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
-        # set time to frame 0
-        self.set_time(0)
-        # save the scene to project file
-        c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
-                          c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
-        c4d.EventAdd()
 
     def get_frame(self):
         # returns the frame corresponding to the current time
@@ -495,3 +498,10 @@ class TwoDScene(Scene):
         # define 2d camera
         self.camera = TwoDCamera()
         super(TwoDScene, self).__init__(project_name)
+
+class ThreeDScene(Scene):
+
+    def __init__(self, project_name):
+        # define 3d camera
+        self.camera = ThreeDCamera()
+        super(ThreeDScene, self).__init__(project_name)

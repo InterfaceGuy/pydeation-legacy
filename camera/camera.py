@@ -1,5 +1,6 @@
 import c4d
 from pydeationlib.object.object import CObject
+from pydeationlib.constants import *
 
 
 class Camera(CObject):
@@ -44,7 +45,17 @@ class Camera(CObject):
 class TwoDCamera(Camera):
 
     def __init__(self):
-                # create object
+        # create object
         self.obj = c4d.CameraObject()
         # set projection to top
         self.obj[c4d.CAMERA_PROJECTION] = 6
+
+class ThreeDCamera(Camera):
+
+    def __init__(self):
+        # create object
+        self.obj = c4d.CameraObject()
+        # set coordinates
+        self.obj[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_Y] = -PI / 2
+        # set projection to top
+        self.obj[c4d.CAMERA_PROJECTION] = 0
