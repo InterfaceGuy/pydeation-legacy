@@ -14,6 +14,8 @@ RED = c4d.Vector(255, 126, 121) / 255
 YELLOW = c4d.Vector(218, 218, 88) / 255
 GREEN = c4d.Vector(71, 196, 143) / 255
 WHITE = c4d.Vector(255, 255, 255) / 255
+BLACK = c4d.Vector(0, 0, 0)
+
 FILLER_TRANSPARENCY = 0.93
 
 

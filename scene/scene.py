@@ -164,6 +164,28 @@ class Scene():
                 # insert spline object under group object
                 child.parent.InsertUnder(child.group_object.obj)
 
+    def add_to_kairos_custom_object(self, custom_object):
+        # handles kairos for custom objects
+
+        # add custom object null to kairos
+        self.doc.InsertObject(custom_object.obj)
+        self.kairos.append(custom_object)
+        # add components to kairos
+        for component in custom_object.components.values():
+            # check object type
+            # cobject
+            if component.ctype == "CObject":
+                # add cobject to kairos
+                self.add_to_kairos_cobject(component)
+                # insert cobject under group object
+                component.obj.InsertUnder(custom_object.obj)
+            # spline object
+            elif component.ctype == "SplineObject":
+                # add spline object to kairos
+                self.add_to_kairos_spline_object(component)
+                # insert spline object under group object
+                component.parent.InsertUnder(custom_object.obj)
+
     def add_to_kairos(self, *cobjects):
         # checks whether object is in kairos and if not adds it
         for cobject in cobjects:
@@ -174,6 +196,9 @@ class Scene():
                 # check for group
                 if cobject.ctype == "Group":
                     self.add_to_kairos_group(cobject)
+                # check for custom object
+                elif cobject.ctype == "CustomObject":
+                    self.add_to_kairos_custom_object(cobject)
                 # check for group member
                 elif hasattr(cobject, "group_object"):
                     # add group object to kairos
@@ -246,6 +271,8 @@ class Scene():
     @staticmethod
     def descs_to_params(descIds):
         # turns descIds into paramIds
+        if len(descIds) == 0:
+            return []
         for descId in descIds:
             if len(descId) == 1:
                 # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
@@ -347,12 +374,12 @@ class Scene():
     def wait(self, time=1):
         self.add_time(time)
 
-    def show(self, *cobjects, fill=False):
+    def show(self, *cobjects, no_fill=False):
         # shows cobjects at given point in time
-        if fill:
-            self.set(DrawThenFill(*cobjects))
-        else:
+        if no_fill:
             self.set(Draw(*cobjects))
+        else:
+            self.set(Create(*cobjects))
 
     def hide(self, *cobjects):
         # hides cobjects at given point in time

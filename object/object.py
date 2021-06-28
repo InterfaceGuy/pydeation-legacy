@@ -1,6 +1,7 @@
 import c4d
 from pydeationlib.constants import *
 from pydeationlib.animation.animation import Animation
+from c4d.utils import SinCos
 
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
@@ -42,7 +43,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -71,7 +72,7 @@ class CObject():
         # set initial parameters
         # transform
         self.set_initial_params_object(self.transform(
-            x=x, y=y, z=z, scale=scale, h=h, p=p, b=b))
+            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b))
         # fill
         self.set_initial_params_filler_material(
             self.fill(transparency=transparency, solid=solid))
@@ -216,7 +217,7 @@ class CObject():
         for value, paramId in zip(values, paramIds):
             self.sketch_mat[paramId] = value
 
-    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, relative=True):
+    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True):
         # transforms the objects position, rotation, scale
 
         # gather descIds
@@ -238,6 +239,12 @@ class CObject():
 
         # convert parameters
         s_x = s_y = s_z = scale
+        if scale_x is not None:
+            s_x = scale_x * scale
+        if scale_y is not None:
+            s_y = scale_y * scale
+        if scale_z is not None:
+            s_z = scale_z * scale
         if relative:
             # get relative values
             rel_values = [x, y, z, h, p, b, s_x, s_y, s_z]
@@ -658,10 +665,29 @@ class CustomObject(Group):
         self.obj = c4d.BaseObject(c4d.Onull)
         self.obj.SetName("CustomObject")
 
-class Observer(CustomObject):
+
+class Eye(CustomObject):
 
     def __init__(self, **params):
 
+        def polar_to_euclidean(r, phi):
+            x = r * SinCos(phi)[0]
+            y = 0
+            z = r * SinCos(phi)[1]
+            return (x, y, z)
+
+        angle = PI / 4
+        radius = 230
+        start_angle = angle / 2
+        end_angle = - angle / 2
+        start_point = polar_to_euclidean(radius, start_angle)
+        end_point = polar_to_euclidean(radius, end_angle)
+
         self.components = {
-            "pupil": Dot()
+            "iris": Dot(x=180, scale_z=3, scale=2),
+            "pupil": Dot(x=190, y=1, scale_z=3, scale=2 / 3, color=BLACK),
+            "eyeball": Arc(angle=angle, h=-angle / 2),
+            "eyelids": Spline([start_point, (0, 0, 0), end_point],
+                              h=-2 * angle)
         }
+        super(Eye, self).__init__(**params)
