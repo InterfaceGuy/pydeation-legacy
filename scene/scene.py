@@ -94,18 +94,10 @@ class Scene():
             self.doc.InsertObject(cobject.obj)
             # add object's materials to kairos
             self.doc.InsertMaterial(cobject.filler_mat)
+            self.doc.InsertMaterial(cobject.sketch_mat)
             # apply filler material to cobject
             cobject.obj.InsertTag(cobject.filler_tag)
-            # select cobject for sketch material workaround
-            self.doc.SetActiveObject(cobject.obj)
-            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
-            c4d.CallCommand(1011012)
-            c4d.CallCommand(100004788, 50038)  # New Tag
-            # write to attributes
-            cobject.sketch_tag = self.doc.GetActiveTag()
-            cobject.sketch_mat = self.doc.GetFirstMaterial()
-            # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
-            cobject.set_sketch_mat(color=cobject.color)
+            cobject.obj.InsertTag(cobject.sketch_tag)
             # add cobject to kairos list
             self.kairos.append(cobject)
             # update cinema
@@ -122,22 +114,14 @@ class Scene():
             self.doc.InsertObject(spline_object.obj)
             # add object's materials to kairos
             self.doc.InsertMaterial(spline_object.filler_mat)
+            self.doc.InsertMaterial(spline_object.sketch_mat)
             # add parent to kairos
             self.doc.InsertObject(spline_object.parent)
             # make spline_object child of parent
             spline_object.obj.InsertUnder(spline_object.parent)
             # apply filler material to parent
             spline_object.parent.InsertTag(spline_object.filler_tag)
-            # select parent for sketch material workaround
-            self.doc.SetActiveObject(spline_object.parent)
-            # sketch material workaround - FIND PROPER WAY IN THE FUTURE!
-            c4d.CallCommand(1011012)
-            c4d.CallCommand(100004788, 50038)  # New Tag
-            # write to attributes
-            spline_object.sketch_tag = self.doc.GetActiveTag()
-            spline_object.sketch_mat = self.doc.GetFirstMaterial()
-            # set params for sketch material - MOVE TO COBJECT INIT IN FUTURE!
-            spline_object.set_sketch_mat(color=spline_object.color)
+            spline_object.parent.InsertTag(spline_object.sketch_tag)
             # add spline object to kairos list
             self.kairos.append(spline_object)
             # update cinema

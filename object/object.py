@@ -54,14 +54,18 @@ class CObject():
         # assign material to tag
         self.filler_tag.SetMaterial(self.filler_mat)
 
-        # create container for sketch material - CHANGE AFTER REPLACING WORKAROUND
-        self.sketch_mat = None
+        # create sketch material
+        self.sketch_mat = c4d.BaseMaterial(c4d.Msketch)
         # create tag
-        self.sketch_tag = None
+        self.sketch_tag = c4d.BaseTag(c4d.Tsketch)
+        # assign material to tag
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
 
         # set universal default params
         self.color = color
         self.set_filler_mat(color=self.color)
+        self.set_sketch_mat(color=self.color)
 
         # set initial parameters
         # transform
@@ -71,8 +75,8 @@ class CObject():
         self.set_initial_params_filler_material(
             self.fill(transparency=transparency, solid=solid))
         # draw
-        # self.set_initial_params_sketch_material(
-        #   self.draw(completion=completion))
+        self.set_initial_params_sketch_material(
+            self.draw(completion=completion))
 
         # because of workaround set_sketch_mat() is called in add_to_kairos()
 
@@ -533,6 +537,17 @@ class Circle(SplineObject):
 
         return (values_filtered, descIds_filtered)
 
+class Dot(Circle):
+
+    def __init__(self, **params):
+        # rescale scale parameter to make it useful for dot
+        if "scale" in params.keys():
+            params["scale"] = 0.05 * params["scale"]
+            super(Dot, self).__init__(solid=True, **params)
+        else:
+            super(Dot, self).__init__(scale=0.05, solid=True, **params)
+
+
 class Sphere(CObject):
 
     def __init__(self, **params):
@@ -592,7 +607,7 @@ class Group(CObject):
     # metadata
     ctype = "Group"
 
-    def __init__(self, *cobjects):
+    def __init__(self, *cobjects, **params):
 
         # create parent null
         self.obj = c4d.BaseObject(c4d.Onull)
@@ -604,3 +619,26 @@ class Group(CObject):
             self.children.append(cobject)
             # mark children as group member
             cobject.group_object = self
+
+
+class CustomObject(Group):
+    """
+    abstract class that groups individual cobjects together to form custom object
+    """
+
+    # metadata
+    ctype = "CustomObject"
+
+    def __init__(self, **params):
+
+        # create parent null
+        self.obj = c4d.BaseObject(c4d.Onull)
+        self.obj.SetName("CustomObject")
+
+class Observer(CustomObject):
+
+    def __init__(self, **params):
+
+        self.components = {
+            "pupil": Dot()
+        }
