@@ -56,6 +56,7 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
         sketch_vp[c4d.OUTLINEMAT_EDLINES_SHOWLINES] = True
         sketch_vp[c4d.OUTLINEMAT_EDLINES_REDRAW_FULL] = True
+        sketch_vp[c4d.OUTLINEMAT_LINE_SPLINES] = True
         # set general render params
         render_data[c4d.RDATA_FRAMESEQUENCE] = 3
         render_data[c4d.RDATA_SAVEIMAGE] = False

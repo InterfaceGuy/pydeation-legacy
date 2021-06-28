@@ -66,6 +66,7 @@ class CObject():
         self.color = color
         self.set_filler_mat(color=self.color)
         self.set_sketch_mat(color=self.color)
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
 
         # set initial parameters
         # transform
@@ -361,9 +362,9 @@ class SplineObject(CObject):
         # execute CObject init
         super(SplineObject, self).__init__(**params)
 
-class OpenSpline(CObject):
+class Spline(SplineObject):
 
-    def __init__(self, points, spline_type="linear", **params):
+    def __init__(self, points, spline_type="linear", closed=False, **params):
         # convert into c4d vectors
         point_vectors = []
         for point in points:
@@ -386,42 +387,18 @@ class OpenSpline(CObject):
         elif spline_type == "bezier":
             self.obj[c4d.SPLINEOBJECT_TYPE] = 4
 
-        # set spline to open
-        self.obj[c4d.SPLINEOBJECT_CLOSED] = False
-
-        # execute CObject init
-        super(OpenSpline, self).__init__(**params)
-
-class ClosedSpline(SplineObject):
-
-    def __init__(self, points, spline_type="linear", **params):
-        # convert into c4d vectors
-        point_vectors = []
-        for point in points:
-            point_vector = c4d.Vector(*point)
-            point_vectors.append(point_vector)
-
-        # create object
-        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
-        # set points
-        self.obj.SetAllPoints(point_vectors)
-        # set interpolation
-        if spline_type == "linear":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
-        elif spline_type == "cubic":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
-        elif spline_type == "akima":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
-        elif spline_type == "b-spline":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
-        elif spline_type == "bezier":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
-
-        # set spline to closed
-        self.obj[c4d.SPLINEOBJECT_CLOSED] = True
-
-        # execute CObject init
-        super(ClosedSpline, self).__init__(**params)
+        if closed:
+            # set spline to closed
+            self.obj[c4d.SPLINEOBJECT_CLOSED] = True
+            # execute SplineObject init
+            super(Spline, self).__init__(**params)
+        else:
+            # set ctype
+            self.ctype = "CObject"
+            # set spline to open
+            self.obj[c4d.SPLINEOBJECT_CLOSED] = False
+            # execute CObject init
+            super(SplineObject, self).__init__(**params)
 
 class Rectangle(SplineObject):
 
@@ -540,13 +517,59 @@ class Circle(SplineObject):
 class Dot(Circle):
 
     def __init__(self, **params):
-        # rescale scale parameter to make it useful for dot
+        # manipulate params to Dot default values
         if "scale" in params.keys():
+            # rescale scale parameter to make it useful for dot
             params["scale"] = 0.05 * params["scale"]
-            super(Dot, self).__init__(solid=True, **params)
         else:
-            super(Dot, self).__init__(scale=0.05, solid=True, **params)
+            params["scale"] = 0.05
+        if "solid" not in params.keys():
+            params["solid"] = True
+        # run Circle init with manipulated params
+        super(Dot, self).__init__(**params)
 
+class Arc(SplineObject):
+
+    def __init__(self, angle=PI / 4, plane="XZ", **params):
+        # create object
+        self.obj = c4d.BaseObject(c4d.Osplinearc)
+        # set ideosynchratic default params
+
+        # set initial paramaters
+        self.set_initial_params_object(self.change_params(
+            angle=angle, plane=plane))
+
+        # set ctype
+        self.ctype = "CObject"
+        # run universal initialisation
+        super(SplineObject, self).__init__(**params)
+
+    def change_params(self, angle=PI / 4, plane="XZ"):
+
+        # gather descIds
+        desc_end_angle = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_ARC_END, c4d.DTYPE_REAL, 0))
+        desc_plane = SplineObject.descIds["plane"]
+
+        descIds = [desc_end_angle, desc_plane]
+
+        # determine default and input values
+        # read out current values
+        curr_values = self.get_current_values(descIds)
+        curr_end_angle, curr_plane_id = curr_values
+
+        # convert parameters
+        # plane
+        plane_id = SplineObject.planes[plane]
+
+        input_values = [angle, plane_id]
+        default_values = curr_values
+
+        # filter out unchanged values
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (values_filtered, descIds_filtered)
 
 class Sphere(CObject):
 
