@@ -8,12 +8,13 @@ class Animator():
     takes in cobjects and groups and returns animations to pass to play() method
     """
 
-    def __new__(cls, animation_name, animation_type, *cobjects, **params):
+    def __new__(cls, animation_name, animation_type, *cobjects, transform_group_object=False, **params):
         # calss animation method of cobjects and passes params
 
         animations = []
         # flatten input in case of groups
-        flattened_cobjects = cls.flatten_input(cobjects)
+        flattened_cobjects = cls.flatten_input(
+            cobjects, transform_group_object=transform_group_object)
         # gather animations
         for cobject in flattened_cobjects:
             animation = getattr(cobject, "animate")(
@@ -23,17 +24,23 @@ class Animator():
         return animations
 
     @staticmethod
-    def flatten_input(cobjects):
+    def flatten_input(cobjects, transform_group_object=False):
         # checks for groups and flattens list
 
         flattened_cobjects = []
 
         for cobject in cobjects:
             if cobject.ctype == "Group":
+                if transform_group_object:
+                    flattened_cobjects.append(cobject)
+                    continue
                 for child in cobject.children:
                     flattened_cobjects.append(child)
                 continue
             elif cobject.ctype == "CustomObject":
+                if transform_group_object:
+                    flattened_cobjects.append(cobject)
+                    continue
                 for component in cobject.components.values():
                     flattened_cobjects.append(component)
                 continue
@@ -174,10 +181,10 @@ class DrawThenUnDraw(Draw, UnDraw):
 
 class Transform(Animator):
 
-    def __new__(cls, *cobjects, **params):
+    def __new__(cls, *cobjects, whole=False, **params):
 
         transform_animations = Animator(
-            "transform", "object_type", *cobjects, **params)
+            "transform", "object_type", *cobjects, transform_group_object=whole, **params)
 
         return transform_animations
 
@@ -202,13 +209,33 @@ class CreateEye(Draw, Fill):
             eyeball = eye.components["eyeball"]
             # set initial parameters
             iris.set_initial_params_filler_material(iris.fill(transparency=1))
+            # gather animations
             fill_iris = Fill(iris, solid=True)
             draw_eyelids_and_eyeball = Draw(eyelids, eyeball)
-
+            # combine to animation group
             eye_creation = AnimationGroup(
                 (fill_iris, (0.3, 1)), (draw_eyelids_and_eyeball, (0, 0.5)))
 
         return eye_creation
+
+class CreateLogo(Draw, FadeIn):
+
+    def __new__(cls, *logos, **params):
+
+        for logo in logos:
+            # get components
+            main_circle = logo.components["main_circle"]
+            small_circle = logo.components["small_circle"]
+            lines = logo.components["lines"]
+            # gather animations
+            draw_main_circle = Draw(main_circle)
+            draw_lines = Draw(lines)
+            fade_in_small_circle = FadeIn(small_circle)
+            # combine to animation group
+            logo_creation = AnimationGroup(
+                (draw_main_circle, (0, 0.3)), (draw_lines, (0.3, 0.6)), (fade_in_small_circle, (0.6, 1)))
+
+        return logo_creation
 
 class Create(CreateEye):
 
@@ -220,6 +247,9 @@ class Create(CreateEye):
             if cobject.__class__.__name__ == "Eye":
                 eye_creation = CreateEye(cobject, **params)
                 creations.append(eye_creation)
+            elif cobject.__class__.__name__ == "Logo":
+                logo_creation = CreateLogo(cobject, **params)
+                creations.append(logo_creation)
             else:
                 generic_creation = DrawThenFill(cobject, **params)
                 creations.append(generic_creation)

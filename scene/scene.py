@@ -163,6 +163,16 @@ class Scene():
                 self.add_to_kairos_spline_object(child)
                 # insert spline object under group object
                 child.parent.InsertUnder(child.group_object.obj)
+            # check for group
+            elif child.ctype == "Group":
+                self.add_to_kairos_group(child)
+                # insert group object under group object
+                child.obj.InsertUnder(child.group_object.obj)
+            # check for custom object
+            elif child.ctype == "CustomObject":
+                self.add_to_kairos_custom_object(child)
+                # insert group object under group object
+                child.obj.InsertUnder(child.group_object.obj)
 
     def add_to_kairos_custom_object(self, custom_object):
         # handles kairos for custom objects
@@ -185,6 +195,12 @@ class Scene():
                 self.add_to_kairos_spline_object(component)
                 # insert spline object under group object
                 component.parent.InsertUnder(custom_object.obj)
+            # group
+            elif component.ctype == "Group":
+                # add group object to kairos
+                self.add_to_kairos_group(component)
+                # insert spline object under group object
+                component.obj.InsertUnder(custom_object.obj)
 
     def add_to_kairos(self, *cobjects):
         # checks whether object is in kairos and if not adds it
@@ -254,7 +270,7 @@ class Scene():
         # get tracks from descIds
 
         # get relevant obj form type
-        obj = self.get_from_type(cobject)
+        obj = self.get_obj_from_type(cobject)
 
         # find or create tracks
         tracks = []
@@ -329,13 +345,17 @@ class Scene():
         c4d.EventAdd()
 
     @staticmethod
-    def get_from_type(cobject):
+    def get_obj_from_type(cobject):
         # checks type and returns relevant object as obj
 
         if hasattr(cobject, "ctype"):
             if cobject.ctype == "CObject":
                 obj = cobject.obj
             elif cobject.ctype == "SplineObject":
+                obj = cobject.obj
+            elif cobject.ctype == "CustomObject":
+                obj = cobject.obj
+            elif cobject.ctype == "Group":
                 obj = cobject.obj
             elif cobject.ctype == "Camera":
                 obj = cobject.obj
@@ -351,7 +371,7 @@ class Scene():
         paramIds = self.descs_to_params(descIds)
 
         # get relevant obj form type
-        obj = self.get_from_type(cobject)
+        obj = self.get_obj_from_type(cobject)
 
         # set values for params
         for paramId, value in zip(paramIds, values):
@@ -365,7 +385,7 @@ class Scene():
 
         # read out value
         # get relevant obj form type
-        obj = self.get_from_type(cobject)
+        obj = self.get_obj_from_type(cobject)
 
         values = [obj[paramId] for paramId in paramIds]
 
