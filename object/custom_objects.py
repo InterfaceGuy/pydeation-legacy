@@ -72,6 +72,36 @@ class Eye(CustomObject):
         }
         super(Eye, self).__init__(**params)
 
+    # NOT FUNCTIONING ATM - NEED TO FIND A WAY TO CHANGE PARAMS OF COMPONENTS!
+    def change_params(self, opening=1):
+
+        # gather descIds
+        desc_arc_angle = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_ARC_END, c4d.DTYPE_REAL, 0))
+
+        descIds = [desc_arc_angle]
+
+        # determine default and input values
+        curr_values = self.get_current_values(descIds)
+        curr_arc_angle = curr_values[0]
+
+        # convert parameters
+        # limit opening to 0-1 range
+        if opening < 0 or opening > 1:
+            raise ValueError("opening value must be between 0-1!")
+
+        # arc angle
+        arc_angle = curr_arc_angle * opening
+
+        input_values = [arc_angle]
+        default_values = curr_values
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (values_filtered, descIds_filtered)
+
 class Logo(CustomObject):
 
     custom_object_name = "Logo"
@@ -92,6 +122,6 @@ class Logo(CustomObject):
         self.components = {
             "main_circle": Circle(color=BLUE),
             "small_circle": Circle(z=focal_height, scale=small_circle_scale, color=YELLOW),
-            "lines": Group(Spline([focal_point, self.polar_to_cartesian(200, angle_offset + angle_lines / 2)]), Spline([focal_point, self.polar_to_cartesian(200, angle_offset - angle_lines / 2)]), group_name="Lines")
+            "lines": Group(Spline([self.polar_to_cartesian(200, angle_offset + angle_lines / 2), focal_point]), Spline([self.polar_to_cartesian(200, angle_offset - angle_lines / 2), focal_point]), group_name="Lines")
         }
         super(Logo, self).__init__(**params)

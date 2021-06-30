@@ -41,7 +41,7 @@ class CObject():
         "stroke_opacity": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_OPACITY, c4d.DTYPE_REAL, 0)),
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
-        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
+        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0)),
     }
     def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE):
 
@@ -62,6 +62,9 @@ class CObject():
         # assign material to tag
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
+
+        # align to spline tag
+        self.align_to_spline_tag = None
 
         # set universal default params
         self.color = color
@@ -137,7 +140,6 @@ class CObject():
             return []
         for descId in descIds:
             if len(descId) == 1:
-                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
                 paramIds = [[descId[0].id] for descId in descIds]
             elif len(descId) == 2:
                 paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
@@ -147,7 +149,7 @@ class CObject():
 
         return paramIds
 
-    def get_current_values(self, descIds, mode=None):
+    def get_current_values(self, descIds, mode="object"):
         # reads out current values from descIds
 
         # get paramIds from descIds
@@ -157,12 +159,15 @@ class CObject():
             curr_values = [self.filler_mat[paramId] for paramId in paramIds]
         elif mode == "sketch":
             curr_values = [self.sketch_mat[paramId] for paramId in paramIds]
-        else:
+        elif mode == "object":
             curr_values = [self.obj[paramId] for paramId in paramIds]
+        elif mode == "spline_tag":
+            curr_values = [self.align_to_spline_tag[paramId]
+                           for paramId in paramIds]
 
         return curr_values
 
-    def animate(self, cobject, animation_name, animation_type, smoothing=0.25, rel_start_point=0, rel_end_point=1, **params):
+    def animate(self, animation_name, animation_type, smoothing=0.25, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -171,7 +176,7 @@ class CObject():
         if rel_end_point < 0 or rel_end_point > 1:
             raise ValueError("relative cut off must be between 0-1!")
 
-        values, descIds = getattr(cobject, animation_name)(**params)
+        values, descIds = getattr(self, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
         animation = Animation(self, descIds, values,
                               animation_type, rel_run_time, animation_name, smoothing)
@@ -339,6 +344,42 @@ class CObject():
         # filter out unchanged variables
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
+
+        return (values_filtered, descIds_filtered)
+
+    def move_along_spline(self, spline=None, start_position=0, end_position=1, tangential=True):
+        # moves the cobject along given spline
+
+        if spline is None:
+            raise ValueError("no spline object provided!")
+
+        # assign spline to tag
+        self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_LINK] = spline.obj
+        # set tangential value
+        self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_TANGENTIAL] = tangential
+        # set start position
+        self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_POSITION] = start_position
+
+        # gather descIds
+        desc_position = c4d.DescID(c4d.DescLevel(
+            c4d.ALIGNTOSPLINETAG_POSITION, c4d.DTYPE_REAL, 0))
+        desc_enable = c4d.DescID(c4d.DescLevel(
+            c4d.EXPRESSION_ENABLE, c4d.DTYPE_LONG, 0))
+
+        descIds = [desc_position, desc_enable]
+
+        # convert parameters
+        enable_tag = True
+
+        # determine default and input values
+        input_values = [end_position, enable_tag]
+        default_values = self.get_current_values(descIds, mode="spline_tag")
+        print(default_values)
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+        print(descIds_filtered, values_filtered)
 
         return (values_filtered, descIds_filtered)
 

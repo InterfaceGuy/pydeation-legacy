@@ -18,7 +18,7 @@ class Animator():
         # gather animations
         for cobject in flattened_cobjects:
             animation = getattr(cobject, "animate")(
-                cobject, animation_name, animation_type, **params)
+                animation_name, animation_type, **params)
             animations.append(animation)
 
         return animations
@@ -181,10 +181,10 @@ class DrawThenUnDraw(Draw, UnDraw):
 
 class Transform(Animator):
 
-    def __new__(cls, *cobjects, whole=False, **params):
+    def __new__(cls, *cobjects, parts=False, **params):
 
         transform_animations = Animator(
-            "transform", "object_type", *cobjects, transform_group_object=whole, **params)
+            "transform", "object_type", *cobjects, transform_group_object=(not parts), **params)
 
         return transform_animations
 
@@ -242,7 +242,7 @@ class Create(CreateEye):
     def __new__(cls, *cobjects, **params):
 
         creations = []
-
+        # execute respective creation animator for cobjects
         for cobject in cobjects:
             if cobject.__class__.__name__ == "Eye":
                 eye_creation = CreateEye(cobject, **params)
@@ -255,3 +255,19 @@ class Create(CreateEye):
                 creations.append(generic_creation)
 
         return creations
+
+class MoveAlongSpline(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        # insert tag for cobjects
+        for cobject in cobjects:
+            # create align to spline tag
+            cobject.align_to_spline_tag = c4d.BaseTag(c4d.Taligntospline)
+            # insert tag to cobject
+            cobject.obj.InsertTag(cobject.align_to_spline_tag)
+
+        move_aling_spline_animations = Animator(
+            "move_along_spline", "spline_tag_type", *cobjects, transform_group_object=True, **params)
+
+        return move_aling_spline_animations

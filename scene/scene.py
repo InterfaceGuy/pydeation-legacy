@@ -67,7 +67,7 @@ class Scene():
         self.chronos = []
 
         # add camera
-        self.add_to_kairos(self.camera)
+        self.add(self.camera)
         # set view to camera
         # get basedraw of scene
         bd = self.doc.GetActiveBaseDraw()
@@ -202,7 +202,7 @@ class Scene():
                 # insert spline object under group object
                 component.obj.InsertUnder(custom_object.obj)
 
-    def add_to_kairos(self, *cobjects):
+    def add(self, *cobjects):
         # checks whether object is in kairos and if not adds it
         for cobject in cobjects:
             # check if already added
@@ -218,7 +218,7 @@ class Scene():
                 # check for group member
                 elif hasattr(cobject, "group_object"):
                     # add group object to kairos
-                    self.add_to_kairos(cobject.group_object)
+                    self.add(cobject.group_object)
                 # individual cobject
                 else:
                     # check object type
@@ -469,6 +469,8 @@ class Scene():
                 target = cobject.sketch_mat
             elif animation_type == "object_type":
                 target = cobject
+            elif animation_type == "spline_tag_type":
+                target = cobject.align_to_spline_tag
             else:
                 raise TypeError("please specify valid animation type")
 
@@ -503,6 +505,8 @@ class Scene():
                 target = cobject.sketch_mat
             elif animation_type == "object_type":
                 target = cobject
+            elif animation_type == "spline_tag_type":
+                target = cobject.align_to_spline_tag
             else:
                 raise TypeError("please specify valid animation type")
 
