@@ -58,5 +58,3 @@ class ThreeDCamera(Camera):
         # set coordinates
         self.obj[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_Y] = -PI / 2
         self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = 1000
-        # set projection to top
-        self.obj[c4d.CAMERA_PROJECTION] = 0

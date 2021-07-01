@@ -260,27 +260,6 @@ class MoveAlongSpline(Animator):
 
     def __new__(cls, *cobjects, parts=False, **params):
 
-        move_along_spline_animations = Animator(
-            "move_along_spline", "spline_tag_type", *cobjects, transform_group_object=(not parts), **params)
-
-        return move_along_spline_animations
-
-class MoveToSpline(Animator):
-
-    def __new__(cls, *cobjects, spline=None, start_position=0, **params):
-
-        move_to_start = Transform(*cobjects, **params)
-        enable_spline_tag = EnableSplineTag(*cobjects, spline=spline, **params)
-
-        move_to_spline = AnimationGroup(
-            (move_to_start, (0, 1)), (enable_spline_tag, (0.99, 1)))
-
-        return move_to_spline
-
-class EnableSplineTag(Animator):
-
-    def __new__(cls, *cobjects, parts=False, **params):
-
         # insert tag for cobjects
         for cobject in cobjects:
             # create align to spline tag
@@ -289,6 +268,11 @@ class EnableSplineTag(Animator):
             cobject.obj.InsertTag(cobject.align_to_spline_tag)
 
         enable_spline_tag = Animator(
-            "enable_spline_tag", "spline_tag_type", *cobjects, transform_group_object=(not parts), **params)
+            "spline_tag", "spline_tag_type", *cobjects, transform_group_object=(not parts), **params)
+        animate_position = Animator(
+            "spline_tag", "spline_tag_type", *cobjects, transform_group_object=(not parts), t_ini=0, t_fin=1, **params)
 
-        return enable_spline_tag
+        move_along_spline = AnimationGroup(
+            (enable_spline_tag, (0, 0.01)), (animate_position, (0.01, 1)))
+
+        return move_along_spline

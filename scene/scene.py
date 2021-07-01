@@ -2,6 +2,7 @@
 from pydeationlib.constants import *
 from pydeationlib.animation.animator import *
 from pydeationlib.camera.camera import *
+from pydeationlib.object.custom_objects import Group
 import os
 import c4d.documents as c4doc
 import c4d
@@ -67,7 +68,7 @@ class Scene():
         self.chronos = []
 
         # add camera
-        self.add(self.camera)
+        self.add(self.camera_group)
         # set view to camera
         # get basedraw of scene
         bd = self.doc.GetActiveBaseDraw()
@@ -171,7 +172,12 @@ class Scene():
             # check for custom object
             elif child.ctype == "CustomObject":
                 self.add_to_kairos_custom_object(child)
-                # insert group object under group object
+                # insert custom object under group object
+                child.obj.InsertUnder(child.group_object.obj)
+            # check for  camera object
+            elif child.ctype == "Camera":
+                self.add_to_kairos_camera(child)
+                # insert camera object under group object
                 child.obj.InsertUnder(child.group_object.obj)
 
     def add_to_kairos_custom_object(self, custom_object):
@@ -510,4 +516,5 @@ class ThreeDScene(Scene):
     def __init__(self, project_name):
         # define 3d camera
         self.camera = ThreeDCamera()
+        self.camera_group = Group(self.camera, group_name="Camera")
         super(ThreeDScene, self).__init__(project_name)

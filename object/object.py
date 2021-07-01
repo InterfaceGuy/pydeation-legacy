@@ -125,7 +125,7 @@ class CObject():
         values_filtered = []
 
         for default_value, descId, input_value in zip(default_values, descIds, input_values):
-            if input_value == default_value:
+            if input_value == default_value or input_value is None:
                 continue
             descIds_filtered.append(descId)
             values_filtered.append(type(default_value)(input_value))
@@ -347,26 +347,7 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def move_along_spline(self, spline=None, end_position=1):
-        # moves the cobject along given spline
-
-        # gather descIds
-        desc_position = c4d.DescID(c4d.DescLevel(
-            c4d.ALIGNTOSPLINETAG_POSITION, c4d.DTYPE_REAL, 0))
-
-        descIds = [desc_position]
-
-        # determine default and input values
-        input_values = [end_position]
-        default_values = self.get_current_values(descIds, mode="spline_tag")
-
-        # filter out unchanged variables
-        descIds_filtered, values_filtered = self.filter_descIds(
-            descIds, default_values, input_values)
-
-        return (values_filtered, descIds_filtered)
-
-    def enable_spline_tag(self, spline=None, start_position=0, enable=True, tangential=True):
+    def spline_tag(self, spline=None, t_ini=None, t_fin=None, enable=True, tangential=True):
         # enables the spline tag
 
         if spline is None:
@@ -377,20 +358,23 @@ class CObject():
         # set tangential value
         self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_TANGENTIAL] = tangential
         # set start position
-        self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_POSITION] = start_position
+        if t_ini is not None:
+            self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_POSITION] = t_ini
         # disable tag
         self.align_to_spline_tag[c4d.EXPRESSION_ENABLE] = False
 
         # gather descIds
         desc_enable = c4d.DescID(c4d.EXPRESSION_ENABLE)
+        desc_position = c4d.DescID(c4d.DescLevel(
+            c4d.ALIGNTOSPLINETAG_POSITION, c4d.DTYPE_REAL, 0))
 
-        descIds = [desc_enable]
-
-        # convert params
-        enable_tag = enable
+        if t_fin is None:
+            descIds = [desc_enable]
+        else:
+            descIds = [desc_enable, desc_position]
 
         # determine default and input values
-        input_values = [enable_tag]
+        input_values = [enable, t_fin]
         default_values = self.get_current_values(descIds, mode="spline_tag")
 
         # filter out unchanged variables
@@ -518,7 +502,7 @@ class Circle(SplineObject):
     RADIUS_X = 200
     RADIUS_Y = 200
 
-    def __init__(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ", **params):
+    def __init__(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ", loft=True, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinecircle)
         # set ideosynchratic default params
@@ -529,7 +513,13 @@ class Circle(SplineObject):
         self.set_initial_params_object(self.change_params(
             ellipse_ratio=ellipse_ratio, ellipse_axis=ellipse_axis, ring_ratio=ring_ratio, plane=plane))
         # run universal initialisation
-        super(Circle, self).__init__(**params)
+        if loft:
+            super(Circle, self).__init__(**params)
+        else:
+            # set ctype
+            self.ctype = "CObject"
+            # execute CObject init
+            super(SplineObject, self).__init__(**params)
 
     def change_params(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ"):
 
