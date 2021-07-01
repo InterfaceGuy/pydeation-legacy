@@ -266,20 +266,17 @@ class Scene():
         frame_fin = frame_ini + frames
         self.set_frame(frame_fin)
 
-    def get_tracks(self, cobject, descIds):
+    def get_tracks(self, target, descIds):
         # get tracks from descIds
-
-        # get relevant obj form type
-        obj = self.get_obj_from_type(cobject)
 
         # find or create tracks
         tracks = []
         for descId in descIds:
-            track = obj.FindCTrack(descId)
+            track = target.FindCTrack(descId)
             if track is None:
-                track = c4d.CTrack(obj, descId)
+                track = c4d.CTrack(target, descId)
                 # insert ctrack into objects timeline
-                obj.InsertTrackSorted(track)
+                target.InsertTrackSorted(track)
             tracks.append(track)
 
         return tracks
@@ -301,24 +298,24 @@ class Scene():
 
         return paramIds
 
-    def get_curves(self, cobject, descIds):
+    def get_curves(self, target, descIds):
         # returns the corresponding curve of the descId
 
         # get tracks
-        tracks = self.get_tracks(cobject, descIds)
+        tracks = self.get_tracks(target, descIds)
 
         # get curves
         curves = [track.GetCurve() for track in tracks]
 
         return curves
 
-    def make_keyframes(self, cobject, descIds, time=None, delay=0, cut_off=0, run_time=1, smoothing=0.25):
+    def make_keyframes(self, target, descIds, time=None, delay=0, cut_off=0, run_time=1, smoothing=0.25):
         # utility function for making keyframing less cluttered
 
         # get curves from descIds
-        curves = self.get_curves(cobject, descIds)
+        curves = self.get_curves(target, descIds)
         # get values from descIds
-        values = self.get_values(cobject, descIds)
+        values = self.get_values(target, descIds)
 
         # determine time
         if time is None:
@@ -344,50 +341,24 @@ class Scene():
 
         c4d.EventAdd()
 
-    @staticmethod
-    def get_obj_from_type(cobject):
-        # checks type and returns relevant object as obj
-
-        if hasattr(cobject, "ctype"):
-            if cobject.ctype == "CObject":
-                obj = cobject.obj
-            elif cobject.ctype == "SplineObject":
-                obj = cobject.obj
-            elif cobject.ctype == "CustomObject":
-                obj = cobject.obj
-            elif cobject.ctype == "Group":
-                obj = cobject.obj
-            elif cobject.ctype == "Camera":
-                obj = cobject.obj
-        else:  # is material
-            obj = cobject
-
-        return obj
-
-    def set_values(self, cobject, descIds, values):
-        # sets the values for the corresponding descIds for given cobject
+    def set_values(self, target, descIds, values):
+        # sets the values for the corresponding descIds for given target
 
         # turn descId into paramId
         paramIds = self.descs_to_params(descIds)
-
-        # get relevant obj form type
-        obj = self.get_obj_from_type(cobject)
 
         # set values for params
         for paramId, value in zip(paramIds, values):
-            obj[paramId] = value
+            target[paramId] = value
 
-    def get_values(self, cobject, descIds):
-        # gets the value for the corresponding descId for given cobject
+    def get_values(self, target, descIds):
+        # gets the value for the corresponding descId for given target
 
         # turn descId into paramId
         paramIds = self.descs_to_params(descIds)
 
-        # read out value
-        # get relevant obj form type
-        obj = self.get_obj_from_type(cobject)
-
-        values = [obj[paramId] for paramId in paramIds]
+        # read out values
+        values = [target[paramId] for paramId in paramIds]
 
         return values
 
@@ -443,6 +414,23 @@ class Scene():
 
         return animations_list
 
+    @staticmethod
+    def target_from_animation_type(cobject, animation_type):
+        # returns relevant target depending on animation type
+
+        if animation_type == "fill_type":
+            target = cobject.filler_mat
+        elif animation_type == "sketch_type":
+            target = cobject.sketch_mat
+        elif animation_type == "object_type":
+            target = cobject.obj
+        elif animation_type == "spline_tag_type":
+            target = cobject.align_to_spline_tag
+        else:
+            raise TypeError("please specify valid animation type")
+
+        return target
+
     def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
 
@@ -462,17 +450,8 @@ class Scene():
             else:
                 abs_delay = run_time * rel_start_point
 
-            # check animation type
-            if animation_type == "fill_type":
-                target = cobject.filler_mat
-            elif animation_type == "sketch_type":
-                target = cobject.sketch_mat
-            elif animation_type == "object_type":
-                target = cobject
-            elif animation_type == "spline_tag_type":
-                target = cobject.align_to_spline_tag
-            else:
-                raise TypeError("please specify valid animation type")
+            # return target depending on animation type
+            target = self.target_from_animation_type(cobject, animation_type)
 
             # keyframe current state
             self.make_keyframes(
@@ -498,17 +477,8 @@ class Scene():
             else:
                 abs_cut_off = run_time * (1 - rel_end_point)
 
-            # check animation type
-            if animation_type == "fill_type":
-                target = cobject.filler_mat
-            elif animation_type == "sketch_type":
-                target = cobject.sketch_mat
-            elif animation_type == "object_type":
-                target = cobject
-            elif animation_type == "spline_tag_type":
-                target = cobject.align_to_spline_tag
-            else:
-                raise TypeError("please specify valid animation type")
+            # return target depending on animation type
+            target = self.target_from_animation_type(cobject, animation_type)
 
             # set the values for corresponding params
             self.set_values(target, descIds, values)

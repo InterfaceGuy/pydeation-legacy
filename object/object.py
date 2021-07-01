@@ -347,8 +347,27 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def move_along_spline(self, spline=None, start_position=0, end_position=1, tangential=True):
+    def move_along_spline(self, spline=None, end_position=1):
         # moves the cobject along given spline
+
+        # gather descIds
+        desc_position = c4d.DescID(c4d.DescLevel(
+            c4d.ALIGNTOSPLINETAG_POSITION, c4d.DTYPE_REAL, 0))
+
+        descIds = [desc_position]
+
+        # determine default and input values
+        input_values = [end_position]
+        default_values = self.get_current_values(descIds, mode="spline_tag")
+
+        # filter out unchanged variables
+        descIds_filtered, values_filtered = self.filter_descIds(
+            descIds, default_values, input_values)
+
+        return (values_filtered, descIds_filtered)
+
+    def enable_spline_tag(self, spline=None, start_position=0, enable=True, tangential=True):
+        # enables the spline tag
 
         if spline is None:
             raise ValueError("no spline object provided!")
@@ -359,30 +378,26 @@ class CObject():
         self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_TANGENTIAL] = tangential
         # set start position
         self.align_to_spline_tag[c4d.ALIGNTOSPLINETAG_POSITION] = start_position
+        # disable tag
+        self.align_to_spline_tag[c4d.EXPRESSION_ENABLE] = False
 
         # gather descIds
-        desc_position = c4d.DescID(c4d.DescLevel(
-            c4d.ALIGNTOSPLINETAG_POSITION, c4d.DTYPE_REAL, 0))
-        desc_enable = c4d.DescID(c4d.DescLevel(
-            c4d.EXPRESSION_ENABLE, c4d.DTYPE_LONG, 0))
+        desc_enable = c4d.DescID(c4d.EXPRESSION_ENABLE)
 
-        descIds = [desc_position, desc_enable]
+        descIds = [desc_enable]
 
-        # convert parameters
-        enable_tag = True
+        # convert params
+        enable_tag = enable
 
         # determine default and input values
-        input_values = [end_position, enable_tag]
+        input_values = [enable_tag]
         default_values = self.get_current_values(descIds, mode="spline_tag")
-        print(default_values)
 
         # filter out unchanged variables
         descIds_filtered, values_filtered = self.filter_descIds(
             descIds, default_values, input_values)
-        print(descIds_filtered, values_filtered)
 
         return (values_filtered, descIds_filtered)
-
 
 class SplineObject(CObject):
 
@@ -401,7 +416,7 @@ class SplineObject(CObject):
     }
 
     def __init__(self, **params):
-            # set orientation to XZ plane
+        # set orientation to XZ plane
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
         # create parent loft for filler material
         self.parent = c4d.BaseObject(c4d.Oloft)
