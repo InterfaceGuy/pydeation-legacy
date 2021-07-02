@@ -55,7 +55,7 @@ class Eye(CustomObject):
 
     custom_object_name = "Eye"
 
-    def __init__(self, **params):
+    def __init__(self, color=BLUE, **params):
 
         opening_angle = PI / 4
         eyeball_radius = 230
@@ -65,10 +65,10 @@ class Eye(CustomObject):
         end_point = self.polar_to_cartesian(eyeball_radius, end_angle)
 
         self.components = {
-            "iris": Dot(x=180, scale_z=3, scale=2),
+            "iris": Dot(x=180, scale_z=3, scale=2, color=color),
             "pupil": Dot(x=190, y=1, scale_z=3, scale=2 / 3, color=BLACK),
-            "eyeball": Arc(angle=opening_angle, h=-opening_angle / 2),
-            "eyelids": Spline([start_point, (0, 0, 0), end_point])
+            "eyeball": Arc(angle=opening_angle, h=-opening_angle / 2, color=color),
+            "eyelids": Spline([start_point, (0, 0, 0), end_point], color=color)
         }
         super(Eye, self).__init__(**params)
 

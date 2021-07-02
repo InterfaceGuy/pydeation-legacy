@@ -68,7 +68,7 @@ class Scene():
         self.chronos = []
 
         # add camera
-        self.add(self.camera_group)
+        self.add(self.camera)
         # set view to camera
         # get basedraw of scene
         bd = self.doc.GetActiveBaseDraw()

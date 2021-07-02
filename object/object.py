@@ -673,3 +673,14 @@ class Text(SplineObject):
 
         # run universal initialisation
         super(Text, self).__init__(**params)
+
+class Plane(CObject):
+
+    def __init__(self, **params):
+        # create object
+        self.obj = c4d.BaseObject(c4d.Oplane)
+
+        # set ideosynchratic default params
+
+        # run universal initialisation
+        super(Plane, self).__init__(**params)
