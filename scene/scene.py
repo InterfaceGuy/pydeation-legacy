@@ -238,7 +238,7 @@ class Scene():
                         self.add_to_kairos_spline_object(cobject)
                     # camera object
                     elif cobject.ctype == "Camera":
-                        # add spline object to kairos
+                        # add camera object to kairos
                         self.add_to_kairos_camera(cobject)
 
     def get_frame(self):
@@ -432,6 +432,12 @@ class Scene():
             target = cobject.obj
         elif animation_type == "spline_tag_type":
             target = cobject.align_to_spline_tag
+        elif animation_type == "visibility_type":
+            if cobject.ctype == "SplineObject":
+                target = cobject.parent
+
+            else:
+                target = cobject.obj
         else:
             raise TypeError("please specify valid animation type")
 
@@ -516,5 +522,6 @@ class ThreeDScene(Scene):
     def __init__(self, project_name):
         # define 3d camera
         self.camera = ThreeDCamera()
-        self.camera_group = Group(self.camera, group_name="Camera")
+        self.camera_group = Group(
+            self.camera, group_name="Camera", b=PI / 4)
         super(ThreeDScene, self).__init__(project_name)

@@ -43,7 +43,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0)),
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE, isoparms=False):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -71,6 +71,8 @@ class CObject():
         self.set_filler_mat(color=self.color)
         self.set_sketch_mat(color=self.color)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
+        self.set_visibility()
 
         # set initial parameters
         # transform
@@ -88,6 +90,14 @@ class CObject():
     def __str__(self):
         # class name as string representation for easier debugging
         return self.__class__.__name__
+
+    def set_visibility(self, show=False):
+        if show:
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_ON
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_ON
+        else:
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_OFF
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_OFF
 
     def set_filler_mat(self, color=BLUE):
         # sets params of filler mat as a function of color
@@ -272,21 +282,25 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def visibility_editor(self, mode="ON"):
+    def visibility(self, in_editor=True, in_render=True):
         # toggle visibility in editor
-        # not used anymore!
 
         # gather descIds
-        descIds = [CObject.descIds["vis_editor"]]
+        descIds = [CObject.descIds["vis_editor"],
+                   CObject.descIds["vis_render"]]
 
         # convert parameters
-        if mode == "ON":
+        if in_editor:
             vis_editor = c4d.MODE_ON
-        elif mode == "OFF":
+        else:
             vis_editor = c4d.MODE_OFF
+        if in_render:
+            vis_render = c4d.MODE_ON
+        else:
+            vis_render = c4d.MODE_OFF
 
         # determine default and input values
-        input_values = [vis_editor]
+        input_values = [vis_editor, vis_render]
         default_values = self.get_current_values(descIds)
 
         # filter out unchanged variables
@@ -408,6 +422,18 @@ class SplineObject(CObject):
         self.parent.SetName(self.obj.GetName())
         # execute CObject init
         super(SplineObject, self).__init__(**params)
+
+    def set_visibility(self, show=False):
+        # override function for splineobjects to work on loft
+        if self.ctype == "SplineObject":
+            if show:
+                self.parent[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_ON
+                self.parent[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_ON
+            else:
+                self.parent[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_OFF
+                self.parent[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_OFF
+        else:  # in case of spline objects without loft run super function
+            super(SplineObject, self).set_visibility()
 
 class Spline(SplineObject):
 
@@ -581,7 +607,7 @@ class Dot(Circle):
         # run Circle init with manipulated params
         super(Dot, self).__init__(**params)
 
-class Arc(SplineObject):
+class Arc(CObject):
 
     def __init__(self, angle=PI / 4, plane="XZ", **params):
         # create object
@@ -595,7 +621,7 @@ class Arc(SplineObject):
         # set ctype
         self.ctype = "CObject"
         # run universal initialisation
-        super(SplineObject, self).__init__(**params)
+        super(Arc, self).__init__(**params)
 
     def change_params(self, angle=PI / 4, plane="XZ"):
 

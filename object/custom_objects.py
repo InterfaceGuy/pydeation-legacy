@@ -28,7 +28,7 @@ class Group(CObject):
         super(Group, self).__init__(**params)
 
 
-class CustomObject(Group):
+class CustomObject(CObject):
     """
     abstract class that groups individual cobjects together to form custom object
     """
@@ -41,7 +41,7 @@ class CustomObject(Group):
         # create parent null
         self.obj = c4d.BaseObject(c4d.Onull)
         self.obj.SetName(self.custom_object_name)
-        super(Group, self).__init__(**params)
+        super(CustomObject, self).__init__(**params)
 
     @staticmethod
     def polar_to_cartesian(r, phi):
@@ -59,8 +59,8 @@ class Eye(CustomObject):
 
         opening_angle = PI / 4
         eyeball_radius = 230
-        start_angle = opening_angle / 2
-        end_angle = - opening_angle / 2
+        start_angle = - opening_angle / 2
+        end_angle = opening_angle / 2
         start_point = self.polar_to_cartesian(eyeball_radius, start_angle)
         end_point = self.polar_to_cartesian(eyeball_radius, end_angle)
 

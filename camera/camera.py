@@ -41,6 +41,13 @@ class Camera(CObject):
 
         return (values_filtered, descIds_filtered)
 
+    def set_visibility(self, show=True):
+        if show:
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_ON
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_ON
+        else:
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_OFF
+            self.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_OFF
 
 class TwoDCamera(Camera):
 

@@ -48,6 +48,31 @@ class Animator():
 
         return flattened_cobjects
 
+class Show(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        for cobject in cobjects:
+            cobject.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_OFF
+            cobject.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_OFF
+
+        show = Animator("visibility",
+                        "visibility_type", *cobjects, in_editor=True, in_render=True, **params)
+
+        return show
+
+class Hide(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        for cobject in cobjects:
+            cobject.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_ON
+            cobject.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_ON
+
+        hide = Animator("visibility",
+                        "visibility_type", *cobjects, in_editor=False, in_render=False, **params)
+
+        return hide
 
 class Draw(Animator):
 
@@ -106,8 +131,10 @@ class FadeIn(Fade):
             cobject.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 0
 
         fadein_animation = Fade(opacity=1.0, *cobjects, **params)
+        animation = AnimationGroup(
+            (Show(*cobjects, **params), (0, 0.01)), (fadein_animation, (0, 1)))
 
-        return fadein_animation
+        return animation
 
 class FadeOut(Fade):
 
@@ -115,8 +142,13 @@ class FadeOut(Fade):
 
         fadeout_animations = Fade(
             opacity=0.0, *cobjects, **params)
+        unfill_animations = UnFill(*cobjects, **params)
+        hide_animations = Hide(*cobjects, **params)
 
-        return fadeout_animations
+        animations = AnimationGroup(
+            (fadeout_animations, (0, 1)), (unfill_animations, (0, 0.5)), (hide_animations, (0.99, 1)))
+
+        return animations
 
 class DrawThenFill(Draw, Fill):
 
@@ -125,8 +157,8 @@ class DrawThenFill(Draw, Fill):
         draw_animations = Draw(*cobjects, **params)
         fill_animations = Fill(*cobjects, **params)
 
-        draw_then_fill_animation_group = AnimationGroup(
-            (draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
+        draw_then_fill_animation_group = AnimationGroup((Show(*cobjects, **params), (0, 0.01)),
+                                                        (draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
 
         return draw_then_fill_animation_group
 
@@ -143,15 +175,16 @@ class DrawThenFillCompletely(Draw, Fill):
 
         return draw_then_fill_animation_group
 
-class UnDrawThenUnFill(UnDraw, UnFill):
+class UnDrawThenUnFill(UnDraw, UnFill, Hide):
 
     def __new__(cls, *cobjects, **params):
 
         undraw_animations = UnDraw(*cobjects, **params)
         unfill_animations = UnFill(*cobjects, **params)
+        hide_animations = Hide(*cobjects, **params)
 
         undraw_then_unfill_animation_group = AnimationGroup(
-            (undraw_animations, (0, 0.6)), (unfill_animations, (0.3, 1)))
+            (undraw_animations, (0, 0.6)), (unfill_animations, (0.3, 0.99)), (hide_animations, (0.99, 1)))
 
         return undraw_then_unfill_animation_group
 
@@ -213,10 +246,29 @@ class CreateEye(Draw, Fill):
             fill_iris = Fill(iris, solid=True)
             draw_eyelids_and_eyeball = Draw(eyelids, eyeball)
             # combine to animation group
-            eye_creation = AnimationGroup(
-                (fill_iris, (0.3, 1)), (draw_eyelids_and_eyeball, (0, 0.5)))
+            eye_creation = AnimationGroup((Show(*eyes, **params), (0, 0.01)),
+                                          (fill_iris, (0.3, 1)), (draw_eyelids_and_eyeball, (0, 0.5)))
 
         return eye_creation
+
+class UnCreateEye(Draw, Fill):
+
+    def __new__(cls, *eyes, **params):
+
+        for eye in eyes:
+            # get components
+            iris = eye.components["iris"]
+            pupil = eye.components["pupil"]
+            eyelids = eye.components["eyelids"]
+            eyeball = eye.components["eyeball"]
+            # gather animations
+            unfill_iris = UnFill(iris)
+            undraw_eyelids_and_eyeball = UnDraw(eyelids, eyeball)
+            # combine to animation group
+            eye_uncreation = AnimationGroup((Hide(*eyes, **params), (0.99, 1)),
+                                            (unfill_iris, (0, 0.5)), (undraw_eyelids_and_eyeball, (0.3, 1)))
+
+        return eye_uncreation
 
 class CreateLogo(Draw, FadeIn):
 
@@ -232,10 +284,29 @@ class CreateLogo(Draw, FadeIn):
             draw_lines = Draw(lines)
             fade_in_small_circle = FadeIn(small_circle)
             # combine to animation group
-            logo_creation = AnimationGroup(
-                (draw_main_circle, (0, 0.3)), (draw_lines, (0.3, 0.6)), (fade_in_small_circle, (0.6, 1)))
+            logo_creation = AnimationGroup((Show(*logos, **params), (0, 0.01)),
+                                           (draw_main_circle, (0, 0.3)), (draw_lines, (0.3, 0.6)), (fade_in_small_circle, (0.6, 1)))
 
         return logo_creation
+
+class UnCreateLogo(Draw, FadeIn):
+
+    def __new__(cls, *logos, **params):
+
+        for logo in logos:
+            # get components
+            main_circle = logo.components["main_circle"]
+            small_circle = logo.components["small_circle"]
+            lines = logo.components["lines"]
+            # gather animations
+            undraw_main_circle = UnDraw(main_circle)
+            undraw_lines = UnDraw(lines)
+            fade_out_small_circle = FadeOut(small_circle)
+            # combine to animation group
+            logo_uncreation = AnimationGroup((Hide(*logos, **params), (0.99, 1)),
+                                             (undraw_main_circle, (0.6, 1)), (undraw_lines, (0.3, 0.6)), (fade_out_small_circle, (0, 0.3)))
+
+        return logo_uncreation
 
 class Create(CreateEye):
 
@@ -252,6 +323,25 @@ class Create(CreateEye):
                 creations.append(logo_creation)
             else:
                 generic_creation = DrawThenFill(cobject, **params)
+                creations.append(generic_creation)
+
+        return creations
+
+class UnCreate(CreateEye):
+
+    def __new__(cls, *cobjects, **params):
+
+        creations = []
+        # execute respective creation animator for cobjects
+        for cobject in cobjects:
+            if cobject.__class__.__name__ == "Eye":
+                eye_uncreation = UnCreateEye(cobject, **params)
+                creations.append(eye_uncreation)
+            elif cobject.__class__.__name__ == "Logo":
+                logo_creation = CreateLogo(cobject, **params)
+                creations.append(logo_creation)
+            else:
+                generic_creation = UnFillThenUnDraw(cobject, **params)
                 creations.append(generic_creation)
 
         return creations

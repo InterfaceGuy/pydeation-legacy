@@ -50,6 +50,18 @@ class AnimationGroup():
         # rescale run times and save rescaled animations
         self.animations = self.rescale_run_times()
 
+    def __iter__(self):
+        self.idx = 0
+        return self
+
+    def __next__(self):
+        if self.idx < len(self.animations):
+            result = self.animations[self.idx]
+            self.idx += 1
+            return result
+        else:
+            raise StopIteration
+
     def rescale_run_times(self):
         # rescale animation run times
 
