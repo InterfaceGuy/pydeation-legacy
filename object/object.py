@@ -30,6 +30,12 @@ class CObject():
                             c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
         "rot_b": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
                             c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+        "rot_h_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+        "rot_p_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+        "rot_b_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "scale": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0)),
         "scale_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
@@ -232,21 +238,34 @@ class CObject():
         for value, paramId in zip(values, paramIds):
             self.sketch_mat[paramId] = value
 
-    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True):
+    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True, frozen=False):
         # transforms the objects position, rotation, scale
 
         # gather descIds
-        descIds = [
-            CObject.descIds["pos_x"],
-            CObject.descIds["pos_y"],
-            CObject.descIds["pos_z"],
-            CObject.descIds["rot_h"],
-            CObject.descIds["rot_p"],
-            CObject.descIds["rot_b"],
-            CObject.descIds["scale_x"],
-            CObject.descIds["scale_y"],
-            CObject.descIds["scale_z"]
-        ]
+        if frozen:
+            descIds = [
+                CObject.descIds["pos_x"],
+                CObject.descIds["pos_y"],
+                CObject.descIds["pos_z"],
+                CObject.descIds["rot_h_frozen"],
+                CObject.descIds["rot_p_frozen"],
+                CObject.descIds["rot_b_frozen"],
+                CObject.descIds["scale_x"],
+                CObject.descIds["scale_y"],
+                CObject.descIds["scale_z"]
+            ]
+        else:
+            descIds = [
+                CObject.descIds["pos_x"],
+                CObject.descIds["pos_y"],
+                CObject.descIds["pos_z"],
+                CObject.descIds["rot_h"],
+                CObject.descIds["rot_p"],
+                CObject.descIds["rot_b"],
+                CObject.descIds["scale_x"],
+                CObject.descIds["scale_y"],
+                CObject.descIds["scale_z"]
+            ]
 
         # determine default and input values
         # read out current values

@@ -17,6 +17,7 @@ class Animation():
         self.rel_duration = rel_run_time[1] - rel_run_time[0]
         self.name = animation_name
         self.smoothing = smoothing
+        self.category = "neutral"
 
     def __str__(self):
 
@@ -41,6 +42,9 @@ class Animation():
         # write to animation
         self.rel_run_time = rel_run_time_rescaled_translated
 
+    def get_cobjects(self):
+        return [self.cobject]
+
 class AnimationGroup():
 
     def __init__(self, *rel_animations_tuples):
@@ -49,6 +53,7 @@ class AnimationGroup():
         self.rel_animations_tuples = rel_animations_tuples
         # rescale run times and save rescaled animations
         self.animations = self.rescale_run_times()
+        self.category = "neutral"
 
     def __iter__(self):
         self.idx = 0
@@ -62,6 +67,27 @@ class AnimationGroup():
         else:
             raise StopIteration
 
+    def get_cobjects(self):
+        # returns the cobjects of animation group
+
+        cobjects = []
+        cobjects = self.cobject_recursion(cobjects)
+
+        return cobjects
+
+    def cobject_recursion(self, cobjects):
+
+        for rel_animations_tuple in self.rel_animations_tuples:
+            animation = rel_animations_tuple[0]
+            if isinstance(animation, Animation):
+                cobject = animation.cobject
+                cobjects.append(cobject)
+            elif isinstance(animation, AnimationGroup):
+                group_cobjects = self.get_cobjects(AnimationGroup)
+                cobjects + group_cobjects
+
+        return cobjects
+
     def rescale_run_times(self):
         # rescale animation run times
 
@@ -69,11 +95,18 @@ class AnimationGroup():
         # unpack relative animations tuples
         for animations, rel_run_time in self.rel_animations_tuples:
             # unpack animations
-            for animation in animations:
+            if isinstance(animations, Animation):
+                animation = animations
                 # rescale animation run time with run time from tuple
                 animation.rescale_run_time(rel_run_time)
                 # append rescaled animations
                 rescaled_animations.append(animation)
+            else:
+                for animation in animations:
+                    # rescale animation run time with run time from tuple
+                    animation.rescale_run_time(rel_run_time)
+                    # append rescaled animations
+                    rescaled_animations.append(animation)
 
         return rescaled_animations
 

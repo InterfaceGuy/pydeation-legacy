@@ -1,4 +1,5 @@
 from pydeationlib.animation.animation import *
+from pydeationlib.constants import *
 import c4d
 
 
