@@ -79,10 +79,20 @@ class Draw(Animator):
 
     def __new__(cls, *cobjects, **params):
 
+        # set initial conditions
+        for cobject in cobjects:
+            # draw completion
+            cobject.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
+            # transparency
+            cobject.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 1
+
         draw_animations = Animator(
             "draw", "sketch_type", *cobjects, **params)
 
-        return draw_animations
+        animations = AnimationGroup(
+            (Show(*cobjects, **params), (0, 0.01)), (draw_animations, (0, 1)))
+
+        return animations
 
 class UnDraw(Animator):
 
@@ -91,16 +101,21 @@ class UnDraw(Animator):
         undraw_animations = Animator("draw", "sketch_type",
                                      completion=0.0, *cobjects, **params)
 
-        return undraw_animations
+        animations = AnimationGroup(
+            (Hide(*cobjects, **params), (0.99, 1)), (undraw_animations, (0, 1)))
+
+        return animations
 
 class Fill(Animator):
 
-    def __new__(cls, *cobjects, **params):
+    def __new__(cls, *cobjects, solid=False, transparency=FILLER_TRANSPARENCY, **params):
 
         fill_animations = Animator(
-            "fill", "fill_type", *cobjects, **params)
+            "fill", "fill_type", *cobjects, solid=solid, transparency=transparency, **params)
+        animations = AnimationGroup(
+            (Show(*cobjects, **params), (0, 0.01)), (fill_animations, (0, 1)))
 
-        return fill_animations
+        return animations
 
 class UnFill(Animator):
 
@@ -108,8 +123,10 @@ class UnFill(Animator):
 
         unfill_animations = Animator("fill", "fill_type",
                                      transparency=1, *cobjects, **params)
+        animations = AnimationGroup(
+            (Hide(*cobjects, **params), (0.99, 1)), (unfill_animations, (0, 1)))
 
-        return unfill_animations
+        return animations
 
 class Fade(Animator):
 
@@ -147,7 +164,7 @@ class FadeOut(Fade):
         hide_animations = Hide(*cobjects, **params)
 
         animations = AnimationGroup(
-            (fadeout_animations, (0, 1)), (unfill_animations, (0, 0.5)), (hide_animations, (0.99, 1)))
+            (fadeout_animations, (0, 1)), (hide_animations, (0.99, 1)))
 
         return animations
 
@@ -323,7 +340,7 @@ class Create(CreateEye):
                 logo_creation = CreateLogo(cobject, **params)
                 creations.append(logo_creation)
             else:
-                generic_creation = DrawThenFill(cobject, **params)
+                generic_creation = Draw(cobject, **params)
                 creations.append(generic_creation)
 
         return creations
@@ -342,7 +359,7 @@ class UnCreate(CreateEye):
                 logo_creation = CreateLogo(cobject, **params)
                 creations.append(logo_creation)
             else:
-                generic_creation = UnFillThenUnDraw(cobject, **params)
+                generic_creation = UnDraw(cobject, **params)
                 creations.append(generic_creation)
 
         return creations
