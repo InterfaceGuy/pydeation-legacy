@@ -31,11 +31,11 @@ class CObject():
         "rot_b": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
                             c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "rot_h_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
-                            c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+                                   c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
         "rot_p_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
-                            c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+                                   c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
         "rot_b_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_ROTATION, c4d.DTYPE_VECTOR, 0),
-                            c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+                                   c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "scale": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0)),
         "scale_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
@@ -49,7 +49,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0)),
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=BLUE, isoparms=False):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -115,7 +115,6 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
-        self.filler_mat[c4d.MATERIAL_DISPLAY_USE_LUMINANCE] = False
 
     def set_sketch_mat(self, color=BLUE):
         # sets params of filler mat as a function of color
@@ -544,19 +543,17 @@ class Rectangle(SplineObject):
 
 class Circle(SplineObject):
 
-    RADIUS_X = 200
-    RADIUS_Y = 200
-
-    def __init__(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ", loft=True, **params):
+    def __init__(self, radius=200, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ", loft=True, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinecircle)
         # set ideosynchratic default params
         self.obj[c4d.PRIM_CIRCLE_ELLIPSE] = True
         self.obj[c4d.PRIM_CIRCLE_RING] = True
-        self.obj[c4d.PRIM_CIRCLE_INNER] = self.obj[c4d.PRIM_CIRCLE_RADIUS]
+        self.obj[c4d.PRIM_CIRCLE_INNER] = radius
+        self.obj[c4d.SPLINEOBJECT_SUB] = 32
         # set initial paramaters
-        self.set_initial_params_object(self.change_params(
-            ellipse_ratio=ellipse_ratio, ellipse_axis=ellipse_axis, ring_ratio=ring_ratio, plane=plane))
+        self.set_initial_params_object(self.change_params(radius=radius,
+                                                          ellipse_ratio=ellipse_ratio, ellipse_axis=ellipse_axis, ring_ratio=ring_ratio, plane=plane))
         # run universal initialisation
         if loft:
             super(Circle, self).__init__(**params)
@@ -566,7 +563,7 @@ class Circle(SplineObject):
             # execute CObject init
             super(SplineObject, self).__init__(**params)
 
-    def change_params(self, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ"):
+    def change_params(self, radius=200, ellipse_ratio=1.0, ellipse_axis="HORIZONTAL", ring_ratio=1.0, plane="XZ"):
 
         # gather descIds
         desc_radius_x = c4d.DescID(c4d.DescLevel(
@@ -592,11 +589,11 @@ class Circle(SplineObject):
             raise ValueError("ring ratio value must be between 0-1!")
         # radius y
         if ellipse_axis == "HORIZONTAL":
-            radius_x = Circle.RADIUS_X
+            radius_x = radius
             radius_y = radius_x * ellipse_ratio
         # radius x
         elif ellipse_axis == "VERTICAL":
-            radius_y = Circle.RADIUS_Y
+            radius_y = radius
             radius_x = radius_y * ellipse_ratio
         # inner radius
         inner_radius = radius_x * ring_ratio

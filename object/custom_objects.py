@@ -125,3 +125,31 @@ class Logo(CustomObject):
             "lines": Group(Spline([self.polar_to_cartesian(200, angle_offset + angle_lines / 2), focal_point]), Spline([self.polar_to_cartesian(200, angle_offset - angle_lines / 2), focal_point]), group_name="Lines")
         }
         super(Logo, self).__init__(**params)
+
+class Cross(CustomObject):
+
+    custom_object_name = "Cross"
+
+    def __init__(self, from_center=False, **params):
+
+        outward_lines = Group(
+            Spline([(0, 0, 0), (0, 0, 200)]),
+            Spline([(0, 0, 0), (200, 0, 0)]),
+            Spline([(0, 0, 0), (0, 0, -200)]),
+            Spline([(0, 0, 0), (-200, 0, 0)])
+        )
+
+        crossing_lines = Group(
+            Spline([(0, 0, -200), (0, 0, 200)]),
+            Spline([(-200, 0, 0), (200, 0, 0)]),
+        )
+
+        if from_center:
+            self.components = {
+                "lines": outward_lines
+            }
+        else:
+            self.components = {
+                "lines": crossing_lines
+            }
+        super(Cross, self).__init__(**params)

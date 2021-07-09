@@ -9,6 +9,8 @@ import c4d
 
 c4d.VPsketch = 1011015  # add missing descriptor for sketch render settings
 
+c4d.RDATA_SAVE_FORMAT_MP4 = 1125
+
 
 class Scene():
     """
@@ -34,7 +36,6 @@ class Scene():
             os.mkdir(self.scene_path)
             print("path successfully created")
         except FileNotFoundError:
-            print(self.scene_name + " is being run as imported scene")
             pass
         except FileExistsError:
             pass
@@ -61,6 +62,7 @@ class Scene():
         # set general render params
         render_data[c4d.RDATA_FRAMESEQUENCE] = 3
         render_data[c4d.RDATA_SAVEIMAGE] = False
+        render_data[c4d.RDATA_FORMAT] = c4d.RDATA_SAVE_FORMAT_MP4
 
         # scene-wide attributes
         self.time = 0
@@ -74,16 +76,42 @@ class Scene():
         bd = self.doc.GetActiveBaseDraw()
         # set camera of basedraw to scene camera
         bd.SetSceneCamera(self.camera.obj)
+        # set viewport effects
+        bd[c4d.BASEDRAW_DATA_HQ_TRANSPARENCY] = True
+        bd[[c4d.BASEDRAW_DATA_COMPLETE_MATERIAL_TRANSPARENCY]] = True
 
-    def finish(self):
+    def finish(self, save=True):
         # set maximum time to time after last animation
         self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
         # set time to frame 0
         self.set_time(0)
+
         # save the scene to project file
-        c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
-                          c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
+        if save:
+            c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
+                              c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
         c4d.EventAdd()
+
+    def add_soundtrack(self, path, offset=0):
+        # adds soundtrack to scene
+
+        # create null for soundtrack
+        sound_null = c4d.BaseObject(c4d.Onull)
+        sound_null.SetName("soundtrack")
+
+        # insert null into document
+        self.doc.InsertObject(sound_null)
+
+        # create sound special track
+        soundtrack = c4d.CTrack(sound_null, c4d.DescID(
+            c4d.DescLevel(c4d.CTsound, c4d.CTsound, 0)))
+
+        # insert track
+        sound_null.InsertTrackSorted(soundtrack)
+
+        # insert soundtrack to track
+        soundtrack[c4d.CID_SOUND_NAME] = path
+        soundtrack[c4d.CID_SOUND_START] = c4d.BaseTime(offset)
 
     def add_to_kairos_cobject(self, cobject):
         # handles kairos for cobjects
@@ -390,12 +418,12 @@ class Scene():
         self.chronos.clear()
 
     def flatten_animations(self, item_list):
-        # unpacks animation groups inside tuple
+        # unpacks animation groups inside tuple and adds cobjects to scene
 
         # define list for unpacked animations
         animations_list = []
-        # function for recursive application
 
+        # function for recursive application
         def process(item_list):
             # discern between types
             for item in item_list:
@@ -443,12 +471,27 @@ class Scene():
 
         return target
 
+    @staticmethod
+    def get_cobjects(flattened_animations):
+        # retreives the cobjects from the flattened animations
+
+        cobjects = []
+
+        for animation in flattened_animations:
+            cobject = animation.get_cobjects()[0]
+            cobjects.append(cobject)
+
+        return cobjects
+
     def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
 
         # set initial keyframes
         # unpack animation groups inside tuple
         animations = self.flatten_animations(animations)
+
+        # get cobjects from flattened animations
+        cobjects = self.get_cobjects(animations)
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
