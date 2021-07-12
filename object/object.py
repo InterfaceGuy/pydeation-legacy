@@ -16,6 +16,7 @@ class CObject():
     ctype = "CObject"
     # universal descIds
     descIds = {
+        # coordinates
         "pos": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0)),
         "pos_x": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
                             c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
@@ -43,9 +44,21 @@ class CObject():
                               c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
         "scale_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_SCALE, c4d.DTYPE_VECTOR, 0),
                               c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
-        "draw_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
-        "stroke_opacity": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_OPACITY, c4d.DTYPE_REAL, 0)),
+
+        # sketch material
+        "sketch_mode": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_MODE, c4d.DTYPE_LONG, 0)),
+        "sketch_stroke_order": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKES, c4d.DTYPE_LONG, 0)),
+        "sketch_method": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_METHOD, c4d.DTYPE_LONG, 0)),
+        "sketch_speed": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE, c4d.DTYPE_LONG, 0)),
+        "sketch_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
+        "sketch_opacity": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_OPACITY, c4d.DTYPE_REAL, 0)),
+        "sketch_draw_speed": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED, c4d.DTYPE_REAL, 0)),
+        "sketch_start_time": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_START, c4d.DTYPE_REAL, 0)),
+
+        # filler material
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
+        
+        # visibility
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0)),
     }
@@ -89,7 +102,7 @@ class CObject():
             self.fill(transparency=transparency, solid=solid))
         # draw
         self.set_initial_params_sketch_material(
-            self.draw(completion=completion))
+            self.sketch_animate(completion=completion))
 
         # because of workaround set_sketch_mat() is called in add_to_kairos()
 
@@ -131,6 +144,7 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_FILTER_STROKES] = False
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKES] = 4
         self.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 1.0
+
 
     @staticmethod
     def filter_descIds(descIds, default_values, input_values):
@@ -237,34 +251,24 @@ class CObject():
         for value, paramId in zip(values, paramIds):
             self.sketch_mat[paramId] = value
 
-    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True, frozen=False):
+    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, h_frozen=0.0, p_frozen=0.0, b_frozen=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True):
         # transforms the objects position, rotation, scale
 
         # gather descIds
-        if frozen:
-            descIds = [
-                CObject.descIds["pos_x"],
-                CObject.descIds["pos_y"],
-                CObject.descIds["pos_z"],
-                CObject.descIds["rot_h_frozen"],
-                CObject.descIds["rot_p_frozen"],
-                CObject.descIds["rot_b_frozen"],
-                CObject.descIds["scale_x"],
-                CObject.descIds["scale_y"],
-                CObject.descIds["scale_z"]
-            ]
-        else:
-            descIds = [
-                CObject.descIds["pos_x"],
-                CObject.descIds["pos_y"],
-                CObject.descIds["pos_z"],
-                CObject.descIds["rot_h"],
-                CObject.descIds["rot_p"],
-                CObject.descIds["rot_b"],
-                CObject.descIds["scale_x"],
-                CObject.descIds["scale_y"],
-                CObject.descIds["scale_z"]
-            ]
+        descIds = [
+            CObject.descIds["pos_x"],
+            CObject.descIds["pos_y"],
+            CObject.descIds["pos_z"],
+            CObject.descIds["rot_h"],
+            CObject.descIds["rot_p"],
+            CObject.descIds["rot_b"],
+            CObject.descIds["rot_h_frozen"],
+            CObject.descIds["rot_p_frozen"],
+            CObject.descIds["rot_b_frozen"],
+            CObject.descIds["scale_x"],
+            CObject.descIds["scale_y"],
+            CObject.descIds["scale_z"]
+        ]
 
         # determine default and input values
         # read out current values
@@ -280,18 +284,18 @@ class CObject():
             s_z = scale_z * scale
         if relative:
             # get relative values
-            rel_values = [x, y, z, h, p, b, s_x, s_y, s_z]
+            rel_values = [x, y, z, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
             # calculate additive absolute values
             abs_values_additive = [curr_value + rel_value for curr_value,
-                                   rel_value in zip(curr_values[:6], rel_values[:6])]
+                                   rel_value in zip(curr_values[:9], rel_values[:9])]
             # calculate multiplicative absolute values
             abs_values_multiplicative = [
-                curr_value * rel_value for curr_value, rel_value in zip(curr_values[6:], rel_values[6:])]
+                curr_value * rel_value for curr_value, rel_value in zip(curr_values[9:], rel_values[9:])]
             # concatenate to absolute values
             input_values = abs_values_additive + abs_values_multiplicative
-            default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+            default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
         else:
-            input_values = [x, y, z, h, p, b, s_x, s_y, s_z]
+            input_values = [x, y, z, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
             default_values = curr_values
 
         # filter out unchanged variables
@@ -327,14 +331,33 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def draw(self, completion=1.0):
+    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", completion=1.0, absolute_opacity=1.0, draw_speed=300, start_time=None):
         # draw contours
 
+        # set initial params
+        if start_time is not None:
+            self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_START] = start_time
+
+        # dicts for options
+        mode = {"draw":0, "length":1, "opacity":2, "thickness":3, "build":4}
+        order = {"long_short":0, "short_long":1, "top_bottom":2, "bottom_top":3, "left_right":4, "right_left":5, "random":6}
+        method = {"single":0, "all":1}
+        speed = {"pixels":0, "completion":2}
+
         # gather descIds
-        descIds = [CObject.descIds["draw_completion"]]
+        descIds = [
+            CObject.descIds["sketch_mode"],
+            CObject.descIds["sketch_stroke_order"],
+            CObject.descIds["sketch_method"],
+            CObject.descIds["sketch_speed"],
+            CObject.descIds["sketch_completion"],
+            CObject.descIds["sketch_opacity"],
+            CObject.descIds["sketch_draw_speed"],
+            CObject.descIds["sketch_start_time"]
+        ]
 
         # determine default and input values
-        input_values = [completion]
+        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time]
         default_values = self.get_current_values(descIds, mode="sketch")
 
         # filter out unchanged variables
@@ -366,8 +389,11 @@ class CObject():
     def fade(self, opacity=1.0):
         # shifts opacity of sketch material
 
+        # set sketch animation mode to opacity
+        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_MODE] = 2
+
         # gather descIds
-        descIds = [CObject.descIds["stroke_opacity"]]
+        descIds = [CObject.descIds["sketch_completion"]]
 
         # determine default and input values
         input_values = [opacity]

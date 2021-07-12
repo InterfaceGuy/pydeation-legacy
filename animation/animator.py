@@ -77,32 +77,29 @@ class Hide(Animator):
 
 class Draw(Animator):
 
-    def __new__(cls, *cobjects, **params):
+    def __new__(cls, *cobjects, completion=1.0, stroke_order="left_right", stroke_method="single", sketch_speed="completion", draw_speed=300, start_time=None, **params):
 
-        # set initial conditions
-        for cobject in cobjects:
-            # draw completion
-            cobject.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
-            # transparency
-            cobject.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 1
-
-        draw_animations = Animator(
-            "draw", "sketch_type", *cobjects, **params)
+        set_options = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, sketch_speed=sketch_speed, completion=None, draw_speed=draw_speed, **params)
+        drawing = Animator(
+            "sketch_animate", "sketch_type", *cobjects, completion=completion, start_time=start_time, **params)
 
         animations = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (draw_animations, (0, 1)))
+            (Show(*cobjects, **params), (0, 0.01)), (set_options, (0, 0.01)), (drawing, (0, 1)))
 
         return animations
 
 class UnDraw(Animator):
 
-    def __new__(cls, *cobjects, **params):
+    def __new__(cls, *cobjects, completion=0, stroke_order="left_right", stroke_method="single", **params):
 
-        undraw_animations = Animator("draw", "sketch_type",
-                                     completion=0.0, *cobjects, **params)
+        set_options = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=None, **params)
+        completion = Animator(
+            "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
 
         animations = AnimationGroup(
-            (Hide(*cobjects, **params), (0.99, 1)), (undraw_animations, (0, 1)))
+            (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (completion, (0, 1)))
 
         return animations
 
@@ -128,43 +125,31 @@ class UnFill(Animator):
 
         return animations
 
-class Fade(Animator):
+class FadeIn(Animator):
 
-    def __new__(cls, *cobjects, **params):
+    def __new__(cls, *cobjects, stroke_order="left_right", completion=1.0, **params):
 
-        fade_animations = Animator(
-            "fade", "sketch_type", *cobjects, **params)
-
-        return fade_animations
-
-class FadeIn(Fade):
-
-    def __new__(cls, *cobjects, **params):
-
-        # set initial conditions
-        for cobject in cobjects:
-            # draw completion
-            cobject.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 1
-            # transparency
-            cobject.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 0
-
-        fadein_animation = Fade(opacity=1.0, *cobjects, **params)
-        animation = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (fadein_animation, (0, 1)))
-
-        return animation
-
-class FadeOut(Fade):
-
-    def __new__(cls, *cobjects, **params):
-
-        fadeout_animations = Fade(
-            opacity=0.0, *cobjects, **params)
-        unfill_animations = UnFill(*cobjects, **params)
-        hide_animations = Hide(*cobjects, **params)
+        set_options = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="opacity", stroke_order=stroke_order, stroke_method="all", completion=None, **params)
+        completion = Animator(
+            "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
 
         animations = AnimationGroup(
-            (fadeout_animations, (0, 1)), (hide_animations, (0.99, 1)))
+            (Show(*cobjects, **params), (0, 0.01)), (set_options, (0, 0.01)), (completion, (0, 1)))
+
+        return animations
+
+class FadeOut(Animator):
+
+    def __new__(cls, *cobjects, stroke_order="left_right", completion=0, **params):
+
+        set_options = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="opacity", stroke_order=stroke_order, stroke_method="all", completion=None, **params)
+        completion = Animator(
+            "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
+
+        animations = AnimationGroup(
+            (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (completion, (0, 1)))
 
         return animations
 
