@@ -1,5 +1,6 @@
 
 from pydeationlib.constants import *
+from pydeationlib.metadata import *
 from pydeationlib.animation.animator import *
 from pydeationlib.camera.camera import *
 from pydeationlib.object.custom_objects import Group
@@ -15,36 +16,29 @@ c4d.RDATA_SAVE_FORMAT_MP4 = 1125
 class Scene():
     """
     The scene class will create a new document, apply the sketch&toon shader and control all the render settings
-
-    NOTE: maybe use BatchRender in the future
     """
 
-    def __init__(self, project_name):
+    def __init__(self, imported=False):
 
-        # file related actions
-        # read in project name
-        self.project_name = project_name
+        # scene-wide attributes
+        self.time = 0
+        self.kairos = []
+        self.chronos = []
+
+        # setup scene but only insert it in c4d if not imported
+        self.setup(insert=(not imported))
+
+    def setup(self, insert=True):
+        # handles everything related to document
+        # document related actions
+        self.doc = c4doc.BaseDocument()
         # use subclass name for scene's name for saving c4d project file
         self.scene_name = self.__class__.__name__
-        self.doc = c4doc.BaseDocument()
-        # this gives us the path of the project to store our individual scene files in
-        self.project_path = os.path.join(PROJECTS_PATH, self.project_name)
-        self.scene_path = os.path.join(
-            PROJECTS_PATH, self.project_name, self.scene_name)
-        # create folder with scene's name
-        try:  # check if folder already exists
-            os.mkdir(self.scene_path)
-            print("path successfully created")
-        except FileNotFoundError:
-            pass
-        except FileExistsError:
-            pass
-
-        # document related actions
         # name document after scene
         self.doc.SetDocumentName(self.scene_name)
         # insert document in menu list
-        c4doc.InsertBaseDocument(self.doc)
+        if insert:
+            c4doc.InsertBaseDocument(self.doc)
         # render settings
         # get render data
         render_data = self.doc.GetActiveRenderData()
@@ -63,12 +57,6 @@ class Scene():
         render_data[c4d.RDATA_FRAMESEQUENCE] = 3
         render_data[c4d.RDATA_SAVEIMAGE] = False
         render_data[c4d.RDATA_FORMAT] = c4d.RDATA_SAVE_FORMAT_MP4
-
-        # scene-wide attributes
-        self.time = 0
-        self.kairos = []
-        self.chronos = []
-
         # add camera
         self.add(self.camera)
         # set view to camera
@@ -80,38 +68,57 @@ class Scene():
         bd[c4d.BASEDRAW_DATA_HQ_TRANSPARENCY] = True
         bd[[c4d.BASEDRAW_DATA_COMPLETE_MATERIAL_TRANSPARENCY]] = True
 
-    def finish(self, save=True):
+    def save(self):
+        # file related actions
+        # read in metadata
+        self.project_name = PROJECT_NAME
+        self.category = CATEGORY
+        self.thinker = THINKER
+        # this gives us the path of the project to store our individual scene files in
+        self.project_path = os.path.join(
+            PROJECTS_PATH, self.category, self.thinker, self.project_name)
+        self.scene_path = os.path.join(self.project_path, self.scene_name)
+        # create folder with scene's name
+        try:  # check if folder already exists
+            os.mkdir(self.scene_path)
+            print("path successfully created")
+        except FileNotFoundError:
+            print("path not found")
+            pass
+        except FileExistsError:
+            pass
+
+        # save the scene to project file
+        c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
+                          c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
+        c4d.EventAdd()
+
+    def finish(self):
         # set maximum time to time after last animation
         self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
         # set time to frame 0
         self.set_time(0)
 
-        # save the scene to project file
-        if save:
-            c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
-                              c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
-        c4d.EventAdd()
+    def audio(self, path, offset=0):
+        # adds audio to scene
 
-    def add_soundtrack(self, path, offset=0):
-        # adds soundtrack to scene
-
-        # create null for soundtrack
+        # create null for audio
         sound_null = c4d.BaseObject(c4d.Onull)
-        sound_null.SetName("soundtrack")
+        sound_null.SetName("audio")
 
         # insert null into document
         self.doc.InsertObject(sound_null)
 
         # create sound special track
-        soundtrack = c4d.CTrack(sound_null, c4d.DescID(
+        audio = c4d.CTrack(sound_null, c4d.DescID(
             c4d.DescLevel(c4d.CTsound, c4d.CTsound, 0)))
 
         # insert track
-        sound_null.InsertTrackSorted(soundtrack)
+        sound_null.InsertTrackSorted(audio)
 
-        # insert soundtrack to track
-        soundtrack[c4d.CID_SOUND_NAME] = path
-        soundtrack[c4d.CID_SOUND_START] = c4d.BaseTime(offset)
+        # insert audio to track
+        audio[c4d.CID_SOUND_NAME] = path
+        audio[c4d.CID_SOUND_START] = c4d.BaseTime(offset)
 
     def add_to_kairos_cobject(self, cobject):
         # handles kairos for cobjects
@@ -555,16 +562,16 @@ class Scene():
 
 class TwoDScene(Scene):
 
-    def __init__(self, project_name):
+    def __init__(self, **params):
         # define 2d camera
         self.camera = TwoDCamera()
-        super(TwoDScene, self).__init__(project_name)
+        super(TwoDScene, self).__init__(**params)
 
 class ThreeDScene(Scene):
 
-    def __init__(self, project_name):
+    def __init__(self, **params):
         # define 3d camera
         self.camera = ThreeDCamera()
         self.camera_group = Group(
             self.camera, group_name="Camera", b=PI / 4)
-        super(ThreeDScene, self).__init__(project_name)
+        super(ThreeDScene, self).__init__(**params)

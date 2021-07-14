@@ -4,9 +4,6 @@ import c4d
 # meta data
 CONTENT_PATH = "/Users/davidrug/Documents/Ataraxia/OpenIdeation/YouTubeChannel/Content"
 PROJECTS_PATH = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R23_2FE1299C/library/scripts/PydeationProjects"
-CATEGORY = "diverse"
-THINKER = "InterfaceGuy"
-PROJECT_NAME = "TestProject"
 
 # material related constants
 BLUE = c4d.Vector(0, 153, 204) / 255

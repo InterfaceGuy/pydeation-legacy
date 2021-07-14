@@ -5,6 +5,7 @@ this way we just have to include "from pydeationlib.imports import *" in our scr
 
 from pydeationlib.scene.scene import *
 from pydeationlib.constants import *
+from pydeationlib.project import *
 from pydeationlib.object.object import *
 from pydeationlib.object.custom_objects import *
 from pydeationlib.camera.camera import *
