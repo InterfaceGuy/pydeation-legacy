@@ -77,15 +77,54 @@ class Hide(Animator):
 
 class Draw(Animator):
 
-    def __new__(cls, *cobjects, completion=1.0, stroke_order="left_right", stroke_method="single", sketch_speed="completion", draw_speed=300, start_time=None, **params):
+    def __new__(cls, *cobjects, completion=1.0, stroke_order="left_right", stroke_method="single", **params):
 
         set_options = Animator(
-            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, sketch_speed=sketch_speed, completion=None, draw_speed=draw_speed, **params)
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=None, **params)
         drawing = Animator(
-            "sketch_animate", "sketch_type", *cobjects, completion=completion, start_time=start_time, **params)
+            "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
 
         animations = AnimationGroup(
             (Show(*cobjects, **params), (0, 0.01)), (set_options, (0, 0.01)), (drawing, (0, 1)))
+
+        return animations
+
+class Erase(Animator):
+
+    def __new__(cls, *cobjects, amount=1, **params):
+
+        set_options = Animator(
+            "sketch_animate", "sketch_type", *cobjects, erase=True, completion=None, **params)
+        erasing = Animator(
+            "sketch_animate", "sketch_type", *cobjects, erase_amount=amount, completion=None, **params)
+
+        animations = AnimationGroup(
+            (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (erasing, (0.01, 1)))
+
+        return animations
+
+class ReDraw(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        drawing = Draw(*cobjects, smoothing_right=0, **params)
+        erasing = Erase(*cobjects, smoothing_left=0, **params)
+
+        animations = AnimationGroup((drawing, (0, 0.52)), (erasing, (0.48, 1)))
+
+        return animations
+
+class DrawSteady(Animator):
+
+    def __new__(cls, *cobjects, stroke_order="left_right", stroke_method="single", sketch_speed="pixels", draw_speed=300, **params):
+
+        set_options_ini = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, sketch_speed=sketch_speed, draw_speed=draw_speed, **params)
+        set_options_fin = Animator(
+            "sketch_animate", "sketch_type", *cobjects, completion=1, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, sketch_speed="completion", **params)
+
+        animations = AnimationGroup(
+            (Show(*cobjects, **params), (0, 0.01)), (set_options_ini, (0, 0.01)), (set_options_fin, (0.99, 1)))
 
         return animations
 
@@ -142,6 +181,10 @@ class FadeIn(Animator):
 class FadeOut(Animator):
 
     def __new__(cls, *cobjects, stroke_order="left_right", completion=0, **params):
+
+        # set initial params
+        for cobject in cobjects:
+            cobject.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 1
 
         set_options = Animator(
             "sketch_animate", "sketch_type", *cobjects, sketch_mode="opacity", stroke_order=stroke_order, stroke_method="all", completion=None, **params)

@@ -350,7 +350,7 @@ class Scene():
 
         return curves
 
-    def make_keyframes(self, target, descIds, time=None, delay=0, cut_off=0, run_time=1, smoothing=0.25):
+    def make_keyframes(self, target, descIds, time=None, delay=0, cut_off=0, run_time=1, smoothing=0.25, smoothing_left=None, smoothing_right=None):
         # utility function for making keyframing less cluttered
 
         # get curves from descIds
@@ -369,11 +369,19 @@ class Scene():
             key = curve.AddKey(time)["key"]
             # set interpolation type
             key.SetInterpolation(curve, c4d.CINTERPOLATION_SPLINE)
-            key.SetTimeRight(curve, c4d.BaseTime(smoothing * run_time))
+            # general smoothing
             key.SetTimeLeft(curve, c4d.BaseTime(-smoothing * run_time))
-            if type(value) == int:
+            key.SetTimeRight(curve, c4d.BaseTime(smoothing * run_time))
+            # override in case of individual values
+            if smoothing_left is not None:
+                key.SetTimeRight(
+                    curve, c4d.BaseTime(-smoothing_left * run_time))
+            if smoothing_right is not None:
+                key.SetTimeLeft(
+                    curve, c4d.BaseTime(-smoothing_right * run_time))
+            if type(value) in (int, c4d.BaseTime):
                 key.SetGeData(curve, value)
-            elif type(value) == float:
+            elif type(value) is float:
                 key.SetValue(curve, value)
                 key.SetValueRight(curve, 0)
                 key.SetValueLeft(curve, 0)
@@ -382,7 +390,7 @@ class Scene():
 
         c4d.EventAdd()
 
-    def set_values(self, target, descIds, values):
+    def set_values(self, target, descIds, values, run_time=None):
         # sets the values for the corresponding descIds for given target
 
         # turn descId into paramId
@@ -390,7 +398,12 @@ class Scene():
 
         # set values for params
         for paramId, value in zip(paramIds, values):
-            target[paramId] = value
+            if type(value) is c4d.BaseTime:
+                # in case of basetime value insert start time of animation
+                target[paramId] = self.get_time(
+                ) - c4d.BaseTime(run_time)  # = start time
+            else:
+                target[paramId] = value
 
     def get_values(self, target, descIds):
         # gets the value for the corresponding descId for given target
@@ -490,6 +503,21 @@ class Scene():
 
         return cobjects
 
+    @staticmethod
+    def unpack_data(animation):
+        # unpacks data and metadata from animation
+
+        cobject = animation.cobject
+        values = animation.values
+        descIds = animation.descIds
+        animation_type = animation.type
+        rel_duration = animation.rel_duration
+        smoothing = animation.smoothing
+        smoothing_left = animation.smoothing_left
+        smoothing_right = animation.smoothing_right
+
+        return cobject, values, descIds, animation_type, rel_duration, smoothing, smoothing_left, smoothing_right
+
     def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
 
@@ -502,7 +530,8 @@ class Scene():
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
-            cobject, values, descIds, animation_type, rel_duration, smoothing = animation.cobject, animation.values, animation.descIds, animation.type, animation.rel_duration, animation.smoothing
+            cobject, values, descIds, animation_type, rel_duration, smoothing, smoothing_left, smoothing_right = self.unpack_data(
+                animation)
             # unpack animation parameters
             rel_start_point, rel_end_point = animation.rel_run_time
             # calculate absolute delay
@@ -517,7 +546,7 @@ class Scene():
 
             # keyframe current state
             self.make_keyframes(
-                target, descIds, delay=abs_delay, run_time=run_time * rel_duration, smoothing=smoothing)
+                target, descIds, delay=abs_delay, run_time=run_time * rel_duration, smoothing=smoothing, smoothing_left=smoothing_left, smoothing_right=smoothing_right)
 
         # add run_time
         if in_frames:
@@ -529,7 +558,8 @@ class Scene():
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
-            cobject, values, descIds, animation_type, rel_duration, smoothing = animation.cobject, animation.values, animation.descIds, animation.type, animation.rel_duration, animation.smoothing
+            cobject, values, descIds, animation_type, rel_duration, smoothing, smoothing_left, smoothing_right = self.unpack_data(
+                animation)
             # unpack animation parameters
             rel_start_point, rel_end_point = animation.rel_run_time
             # calculate absolute delay
@@ -543,10 +573,10 @@ class Scene():
             target = self.target_from_animation_type(cobject, animation_type)
 
             # set the values for corresponding params
-            self.set_values(target, descIds, values)
+            self.set_values(target, descIds, values, run_time=run_time)
             # keyframe current state
             self.make_keyframes(
-                target, descIds, cut_off=abs_cut_off, run_time=run_time * rel_duration, smoothing=smoothing)
+                target, descIds, cut_off=abs_cut_off, run_time=run_time * rel_duration, smoothing=smoothing, smoothing_left=smoothing_left, smoothing_right=smoothing_right)
 
     def set(self, *transformations):
         # sets object to end state of animation without playing it

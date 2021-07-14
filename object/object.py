@@ -53,14 +53,16 @@ class CObject():
         "sketch_completion": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE, c4d.DTYPE_REAL, 0)),
         "sketch_opacity": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_OPACITY, c4d.DTYPE_REAL, 0)),
         "sketch_draw_speed": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED, c4d.DTYPE_REAL, 0)),
-        "sketch_start_time": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_START, c4d.DTYPE_REAL, 0)),
+        "sketch_start_time": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_START, c4d.DTYPE_TIME, 0)),
+        "sketch_resize_strokes": c4d.DescID(c4d.OUTLINEMAT_ADJUSTMENT_STROKE_RESIZE),
+        "sketch_stroke_start": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ADJUSTMENT_STROKESTART, c4d.DTYPE_REAL, 0)),
 
         # filler material
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
         
         # visibility
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
-        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0)),
+        "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
     def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False):
 
@@ -144,7 +146,9 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_FILTER_STROKES] = False
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKES] = 4
         self.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 1.0
-
+        self.sketch_mat[c4d.OUTLINEMAT_ADV_SELFBLENDMODE] = 1  # self-blend average to handle overlapping
+        self.sketch_mat[c4d.OUTLINEMAT_CONNECTIIONZ] = 3  # set Match to World to only connect strokes that touch
+        self.sketch_mat[c4d.OUTLINEMAT_JOIN_ANGLE_LIMIT] = PI  # set Join Limit to 180° to connect strokes over all corners
 
     @staticmethod
     def filter_descIds(descIds, default_values, input_values):
@@ -196,7 +200,7 @@ class CObject():
 
         return curr_values
 
-    def animate(self, animation_name, animation_type, smoothing=0.25, rel_start_point=0, rel_end_point=1, **params):
+    def animate(self, animation_name, animation_type, smoothing=0.25, smoothing_left=None, smoothing_right=None, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
@@ -208,7 +212,7 @@ class CObject():
         values, descIds = getattr(self, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
         animation = Animation(self, descIds, values,
-                              animation_type, rel_run_time, animation_name, smoothing)
+                              animation_type, rel_run_time, animation_name, smoothing, smoothing_left, smoothing_right)
 
         return animation
 
@@ -331,12 +335,8 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", completion=1.0, absolute_opacity=1.0, draw_speed=300, start_time=None):
+    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", completion=None, absolute_opacity=None, draw_speed=None, erase=False, erase_amount=None):
         # draw contours
-
-        # set initial params
-        if start_time is not None:
-            self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_START] = start_time
 
         # dicts for options
         mode = {"draw":0, "length":1, "opacity":2, "thickness":3, "build":4}
@@ -353,11 +353,19 @@ class CObject():
             CObject.descIds["sketch_completion"],
             CObject.descIds["sketch_opacity"],
             CObject.descIds["sketch_draw_speed"],
-            CObject.descIds["sketch_start_time"]
+            CObject.descIds["sketch_start_time"],
+            CObject.descIds["sketch_resize_strokes"],
+            CObject.descIds["sketch_stroke_start"]
         ]
 
+        # create placeholder value for start_time, gets overwritten in play
+        if sketch_speed == "pixels":
+            start_time = 0
+        else:
+            start_time = None
+
         # determine default and input values
-        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time]
+        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time, erase, erase_amount]
         default_values = self.get_current_values(descIds, mode="sketch")
 
         # filter out unchanged variables
