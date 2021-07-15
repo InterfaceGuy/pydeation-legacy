@@ -15,7 +15,7 @@ class Animator():
         animations = []
         # flatten input in case of groups
         flattened_cobjects = cls.flatten_input(
-            cobjects, transform_group_object=transform_group_object)
+            *cobjects, transform_group_object=transform_group_object)
         # gather animations
         for cobject in flattened_cobjects:
             animation = getattr(cobject, "animate")(
@@ -25,27 +25,33 @@ class Animator():
         return animations
 
     @staticmethod
-    def flatten_input(cobjects, transform_group_object=False):
+    def flatten_input(*cobjects, transform_group_object=False):
         # checks for groups and flattens list
 
         flattened_cobjects = []
 
-        for cobject in cobjects:
-            if cobject.ctype == "Group":
-                if transform_group_object:
-                    flattened_cobjects.append(cobject)
+        def flatten_recursion(*cobjects, transform_group_object=False):
+            # subfunction to be used recursively in order to unpack nested groups
+            for cobject in cobjects:
+                if cobject.ctype == "Group":
+                    if transform_group_object:
+                        flattened_cobjects.append(cobject)
+                        continue
+                    for child in cobject.children:
+                        flatten_recursion(child)
                     continue
-                for child in cobject.children:
-                    flattened_cobjects.append(child)
-                continue
-            elif cobject.ctype == "CustomObject":
-                if transform_group_object:
-                    flattened_cobjects.append(cobject)
+                elif cobject.ctype == "CustomObject":
+                    if transform_group_object:
+                        flattened_cobjects.append(cobject)
+                        continue
+                    for component in cobject.components.values():
+                        flatten_recursion(component)
                     continue
-                for component in cobject.components.values():
-                    flattened_cobjects.append(component)
-                continue
-            flattened_cobjects.append(cobject)
+                flattened_cobjects.append(cobject)
+
+            return flattened_cobjects
+
+        flattened_cobjects = flatten_recursion(*cobjects)
 
         return flattened_cobjects
 

@@ -27,6 +27,7 @@ class Scene():
 
         # setup scene but only insert it in c4d if not imported
         self.setup(insert=(not imported))
+        self.construct()
 
     def setup(self, insert=True):
         # handles everything related to document
