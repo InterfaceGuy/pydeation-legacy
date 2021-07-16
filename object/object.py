@@ -64,7 +64,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -90,7 +90,7 @@ class CObject():
         # set universal default params
         self.color = color
         self.set_filler_mat(color=self.color)
-        self.set_sketch_mat(color=self.color)
+        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
         self.set_visibility()
@@ -131,11 +131,19 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
-    def set_sketch_mat(self, color=BLUE):
+    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3):
         # sets params of filler mat as a function of color
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
-        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = 3
+        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = thickness
+        if arrow_start:
+            self.sketch_mat[c4d.OUTLINEMAT_LINESTART] = 4
+        if arrow_end:
+            self.sketch_mat[c4d.OUTLINEMAT_LINEEND] = 4
+        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_WIDTH] = 5
+        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_HEIGHT] = 5
+        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_WIDTH] = 5
+        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_HEIGHT] = 5
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = False

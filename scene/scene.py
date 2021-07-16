@@ -18,7 +18,7 @@ class Scene():
     The scene class will create a new document, apply the sketch&toon shader and control all the render settings
     """
 
-    def __init__(self, imported=False):
+    def __init__(self, imported=False, quality="normal"):
 
         # scene-wide attributes
         self.time = 0
@@ -26,10 +26,10 @@ class Scene():
         self.chronos = []
 
         # setup scene but only insert it in c4d if not imported
-        self.setup(insert=(not imported))
+        self.setup(insert=(not imported), quality=quality)
         self.construct()
 
-    def setup(self, insert=True):
+    def setup(self, insert=True, quality="normal"):
         # handles everything related to document
         # document related actions
         self.doc = c4doc.BaseDocument()
@@ -51,6 +51,10 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
         sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
+        # set mode to custom
+        sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT_MODE] = 1
+        sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_BASEW] = 1280  # set custom width
+        sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_BASEH] = 700  # set custom height
         sketch_vp[c4d.OUTLINEMAT_EDLINES_SHOWLINES] = True
         sketch_vp[c4d.OUTLINEMAT_EDLINES_REDRAW_FULL] = True
         sketch_vp[c4d.OUTLINEMAT_LINE_SPLINES] = True
@@ -58,6 +62,22 @@ class Scene():
         render_data[c4d.RDATA_FRAMESEQUENCE] = 3
         render_data[c4d.RDATA_SAVEIMAGE] = False
         render_data[c4d.RDATA_FORMAT] = c4d.RDATA_SAVE_FORMAT_MP4
+        # set quality
+        if quality == "verylow":
+            render_data[c4d.RDATA_XRES] = 320
+            render_data[c4d.RDATA_YRES] = 180
+        elif quality == "low":
+            render_data[c4d.RDATA_XRES] = 480
+            render_data[c4d.RDATA_YRES] = 270
+        elif quality == "normal":
+            render_data[c4d.RDATA_XRES] = 1280
+            render_data[c4d.RDATA_YRES] = 720
+        elif quality == "high":
+            render_data[c4d.RDATA_XRES] = 2560
+            render_data[c4d.RDATA_YRES] = 1440
+        elif quality == "veryhigh":
+            render_data[c4d.RDATA_XRES] = 3840
+            render_data[c4d.RDATA_YRES] = 2160
         # add camera
         self.add(self.camera)
         # set view to camera

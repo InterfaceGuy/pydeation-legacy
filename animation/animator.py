@@ -51,7 +51,8 @@ class Animator():
 
             return flattened_cobjects
 
-        flattened_cobjects = flatten_recursion(*cobjects)
+        flattened_cobjects = flatten_recursion(
+            *cobjects, transform_group_object=transform_group_object)
 
         return flattened_cobjects
 
@@ -83,15 +84,17 @@ class Hide(Animator):
 
 class Draw(Animator):
 
-    def __new__(cls, *cobjects, completion=1.0, stroke_order="left_right", stroke_method="single", **params):
+    def __new__(cls, *cobjects, completion=1.0, stroke_order="long_short", stroke_method="single", **params):
 
-        set_options = Animator(
-            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=None, **params)
+        set_options_ini = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, **params)
         drawing = Animator(
             "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
+        set_options_fin = Animator(
+            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=completion, **params)
 
         animations = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (set_options, (0, 0.01)), (drawing, (0, 1)))
+            (Show(*cobjects, **params), (0, 0.01)), (set_options_ini, (0, 0.01)), (drawing, (0.01, 0.99)), (set_options_fin, (0.99, 1)))
 
         return animations
 
@@ -99,13 +102,26 @@ class Erase(Animator):
 
     def __new__(cls, *cobjects, amount=1, **params):
 
-        set_options = Animator(
-            "sketch_animate", "sketch_type", *cobjects, erase=True, completion=None, **params)
+        set_options_ini = Animator(
+            "sketch_animate", "sketch_type", *cobjects, erase=True, **params)
         erasing = Animator(
-            "sketch_animate", "sketch_type", *cobjects, erase_amount=amount, completion=None, **params)
+            "sketch_animate", "sketch_type", *cobjects, erase_amount=amount, **params)
+        set_options_fin = Animator(
+            "sketch_animate", "sketch_type", *cobjects, erase=False, completion=0, **params)
 
         animations = AnimationGroup(
-            (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (erasing, (0.01, 1)))
+            (Hide(*cobjects, **params), (0.99, 1)), (set_options_ini, (0, 0.01)), (erasing, (0.01, 1)), (set_options_fin, (0.99, 1)))
+
+        return animations
+
+class Glimpse(Animator):
+
+    def __new__(cls, *cobjects, **params):
+
+        drawing = Draw(*cobjects, smoothing_right=0, **params)
+        erasing = Erase(*cobjects, smoothing_left=0, **params)
+
+        animations = AnimationGroup((drawing, (0, 0.5)), (erasing, (0.5, 1)))
 
         return animations
 
@@ -113,10 +129,10 @@ class ReDraw(Animator):
 
     def __new__(cls, *cobjects, **params):
 
-        drawing = Draw(*cobjects, smoothing_right=0, **params)
-        erasing = Erase(*cobjects, smoothing_left=0, **params)
+        erasing = Erase(*cobjects, smoothing_right=0, **params)
+        drawing = Draw(*cobjects, smoothing_left=0, **params)
 
-        animations = AnimationGroup((drawing, (0, 0.52)), (erasing, (0.48, 1)))
+        animations = AnimationGroup((erasing, (0, 0.5)), (drawing, (0.5, 1)))
 
         return animations
 

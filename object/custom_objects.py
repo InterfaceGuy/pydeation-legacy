@@ -130,18 +130,24 @@ class Cross(CustomObject):
 
     custom_object_name = "Cross"
 
-    def __init__(self, from_center=False, **params):
+    def __init__(self, from_center=False, arrow_start=False, arrow_end=False, **params):
 
         outward_lines = Group(
-            Spline([(0, 0, 0), (0, 0, 200)]),
-            Spline([(0, 0, 0), (200, 0, 0)]),
-            Spline([(0, 0, 0), (0, 0, -200)]),
-            Spline([(0, 0, 0), (-200, 0, 0)])
+            Spline([(0, 0, 0), (0, 0, 200)],
+                   arrow_start=arrow_start, arrow_end=arrow_end),
+            Spline([(0, 0, 0), (200, 0, 0)],
+                   arrow_start=arrow_start, arrow_end=arrow_end),
+            Spline([(0, 0, 0), (0, 0, -200)],
+                   arrow_start=arrow_start, arrow_end=arrow_end),
+            Spline([(0, 0, 0), (-200, 0, 0)],
+                   arrow_start=arrow_start, arrow_end=arrow_end)
         )
 
         crossing_lines = Group(
-            Spline([(0, 0, -200), (0, 0, 200)]),
-            Spline([(-200, 0, 0), (200, 0, 0)]),
+            Spline([(0, 0, -200), (0, 0, 200)],
+                   arrow_start=arrow_start, arrow_end=arrow_end),
+            Spline([(-200, 0, 0), (200, 0, 0)],
+                   arrow_start=arrow_start, arrow_end=arrow_end),
         )
 
         if from_center:
