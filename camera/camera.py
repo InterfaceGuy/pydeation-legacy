@@ -66,7 +66,7 @@ class ThreeDCamera(Camera):
         self.obj[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_Y] = -PI / 2
         self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = 1000
 
-    def change_params(self, zoom=1, offset_x=0, offset_y=0):
+    def change_params(self, zoom=1, offset_x=0, offset_y=0, relative=True):
         # changes the zoom of the camera
 
         # gather descIds
@@ -85,8 +85,10 @@ class ThreeDCamera(Camera):
 
         # convert params
         curr_focal_length, __, __ = curr_values
-        # multiply current focal length by zoom factor
-        zoom = curr_focal_length * zoom
+
+        if relative:
+            # multiply current focal length by zoom factor
+            zoom = curr_focal_length * zoom
 
         input_values = [zoom, offset_x, offset_y]
         default_values = curr_values

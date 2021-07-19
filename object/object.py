@@ -64,7 +64,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3, line_style="solid", stroke_order="long_short"):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -90,7 +90,7 @@ class CObject():
         # set universal default params
         self.color = color
         self.set_filler_mat(color=self.color)
-        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness)
+        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
         self.set_visibility()
@@ -131,19 +131,11 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
-    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3):
+    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3, line_style="solid", stroke_order="long_short"):
         # sets params of filler mat as a function of color
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
         self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = thickness
-        if arrow_start:
-            self.sketch_mat[c4d.OUTLINEMAT_LINESTART] = 4
-        if arrow_end:
-            self.sketch_mat[c4d.OUTLINEMAT_LINEEND] = 4
-        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_WIDTH] = 5
-        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_HEIGHT] = 5
-        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_WIDTH] = 5
-        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_HEIGHT] = 5
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = False
@@ -157,6 +149,26 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_ADV_SELFBLENDMODE] = 1  # self-blend average to handle overlapping
         self.sketch_mat[c4d.OUTLINEMAT_CONNECTIIONZ] = 3  # set Match to World to only connect strokes that touch
         self.sketch_mat[c4d.OUTLINEMAT_JOIN_ANGLE_LIMIT] = PI  # set Join Limit to 180° to connect strokes over all corners
+        # arrows
+        if arrow_start:
+            self.sketch_mat[c4d.OUTLINEMAT_LINESTART] = 4
+        if arrow_end:
+            self.sketch_mat[c4d.OUTLINEMAT_LINEEND] = 4
+        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_WIDTH] = 7
+        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_HEIGHT] = 7
+        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_WIDTH] = 7
+        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_HEIGHT] = 7
+        # line style
+        self.sketch_mat[c4d.OUTLINEMAT_PATTERN] = 1
+        if line_style == "solid":
+            self.sketch_mat[c4d.OUTLINEMAT_PATTERN_PRESET] = 0
+        elif line_style == "dashed":
+            self.sketch_mat[c4d.OUTLINEMAT_PATTERN_PRESET] = 1
+        elif line_style == "dotted":
+            self.sketch_mat[c4d.OUTLINEMAT_PATTERN_PRESET] = 2
+        # stroke order
+        order = {"long_short":0, "short_long":1, "top_bottom":2, "bottom_top":3, "left_right":4, "right_left":5, "random":6}
+        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKES] = order[stroke_order]
 
     @staticmethod
     def filter_descIds(descIds, default_values, input_values):
@@ -347,10 +359,10 @@ class CObject():
         # draw contours
 
         # dicts for options
-        mode = {"draw":0, "length":1, "opacity":2, "thickness":3, "build":4}
-        order = {"long_short":0, "short_long":1, "top_bottom":2, "bottom_top":3, "left_right":4, "right_left":5, "random":6}
-        method = {"single":0, "all":1}
-        speed = {"pixels":0, "completion":2}
+        mode = {None: None, "draw":0, "length":1, "opacity":2, "thickness":3, "build":4}
+        order = {None: None, "long_short":0, "short_long":1, "top_bottom":2, "bottom_top":3, "left_right":4, "right_left":5, "random":6}
+        method = {None: None, "single":0, "all":1}
+        speed = {None: None, "pixels":0, "completion":2}
 
         # gather descIds
         descIds = [
@@ -667,39 +679,41 @@ class Dot(Circle):
 
 class Arc(CObject):
 
-    def __init__(self, angle=PI / 4, plane="XZ", **params):
+    def __init__(self, angle=PI / 2, plane="XZ", radius=200, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinearc)
         # set ideosynchratic default params
 
         # set initial paramaters
         self.set_initial_params_object(self.change_params(
-            angle=angle, plane=plane))
+            angle=angle, plane=plane, radius=radius))
 
         # set ctype
         self.ctype = "CObject"
         # run universal initialisation
         super(Arc, self).__init__(**params)
 
-    def change_params(self, angle=PI / 4, plane="XZ"):
+    def change_params(self, angle=PI / 4, plane="XZ", radius=200):
 
         # gather descIds
         desc_end_angle = c4d.DescID(c4d.DescLevel(
             c4d.PRIM_ARC_END, c4d.DTYPE_REAL, 0))
         desc_plane = SplineObject.descIds["plane"]
+        desc_radius = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_ARC_RADIUS, c4d.DTYPE_REAL, 0))
 
-        descIds = [desc_end_angle, desc_plane]
+        descIds = [desc_end_angle, desc_plane, desc_radius]
 
         # determine default and input values
         # read out current values
         curr_values = self.get_current_values(descIds)
-        curr_end_angle, curr_plane_id = curr_values
+        curr_end_angle, curr_plane_id, curr_radius = curr_values
 
         # convert parameters
         # plane
         plane_id = SplineObject.planes[plane]
 
-        input_values = [angle, plane_id]
+        input_values = [angle, plane_id, radius]
         default_values = curr_values
 
         # filter out unchanged values
@@ -746,7 +760,7 @@ class Cylinder(CObject):
 
 class Text(SplineObject):
 
-    def __init__(self, text, **params):
+    def __init__(self, text, stroke_order="left_right", thickness=1, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinetext)
 
@@ -756,7 +770,7 @@ class Text(SplineObject):
         self.obj[c4d.PRIM_TEXT_HEIGHT] = 100.0
 
         # run universal initialisation
-        super(Text, self).__init__(**params)
+        super(Text, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
 
 class Plane(CObject):
 

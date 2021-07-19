@@ -66,7 +66,7 @@ class Eye(CustomObject):
 
         self.components = {
             "iris": Dot(x=180, scale_z=3, scale=2, color=color),
-            "pupil": Dot(x=190, y=1, scale_z=3, scale=2 / 3, color=BLACK),
+            "pupil": Dot(x=190, y=2, scale_z=3, scale=2 / 3, color=BLACK),
             "eyeball": Arc(angle=opening_angle, h=-opening_angle / 2, color=color),
             "eyelids": Spline([start_point, (0, 0, 0), end_point], color=color)
         }

@@ -84,17 +84,15 @@ class Hide(Animator):
 
 class Draw(Animator):
 
-    def __new__(cls, *cobjects, completion=1.0, stroke_order="long_short", stroke_method="single", **params):
+    def __new__(cls, *cobjects, completion=1.0, stroke_order=None, stroke_method="single", **params):
 
         set_options_ini = Animator(
             "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, **params)
         drawing = Animator(
             "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
-        set_options_fin = Animator(
-            "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=completion, **params)
 
         animations = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (set_options_ini, (0, 0.01)), (drawing, (0.01, 0.99)), (set_options_fin, (0.99, 1)))
+            (Show(*cobjects, **params), (0, 0.01)), (set_options_ini, (0, 0.01)), (drawing, (0.01, 0.99)))
 
         return animations
 
@@ -138,7 +136,7 @@ class ReDraw(Animator):
 
 class DrawSteady(Animator):
 
-    def __new__(cls, *cobjects, stroke_order="left_right", stroke_method="single", sketch_speed="pixels", draw_speed=300, **params):
+    def __new__(cls, *cobjects, stroke_order=None, stroke_method="single", sketch_speed="pixels", draw_speed=300, **params):
 
         set_options_ini = Animator(
             "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, sketch_speed=sketch_speed, draw_speed=draw_speed, **params)
@@ -152,7 +150,7 @@ class DrawSteady(Animator):
 
 class UnDraw(Animator):
 
-    def __new__(cls, *cobjects, completion=0, stroke_order="left_right", stroke_method="single", **params):
+    def __new__(cls, *cobjects, completion=0, stroke_order=None, stroke_method="single", **params):
 
         set_options = Animator(
             "sketch_animate", "sketch_type", *cobjects, sketch_mode="draw", stroke_order=stroke_order, stroke_method=stroke_method, completion=None, **params)
@@ -188,7 +186,7 @@ class UnFill(Animator):
 
 class FadeIn(Animator):
 
-    def __new__(cls, *cobjects, stroke_order="left_right", completion=1.0, **params):
+    def __new__(cls, *cobjects, stroke_order=None, completion=1.0, **params):
 
         set_options = Animator(
             "sketch_animate", "sketch_type", *cobjects, sketch_mode="opacity", stroke_order=stroke_order, stroke_method="all", completion=None, **params)
@@ -202,7 +200,7 @@ class FadeIn(Animator):
 
 class FadeOut(Animator):
 
-    def __new__(cls, *cobjects, stroke_order="left_right", completion=0, **params):
+    def __new__(cls, *cobjects, stroke_order=None, completion=0, **params):
 
         # set initial params
         for cobject in cobjects:
@@ -300,7 +298,7 @@ class ChangeParams(Animator):
 
 class CreateEye(Draw, Fill):
 
-    def __new__(cls, *eyes, **params):
+    def __new__(cls, *eyes, rel_start_point=0, rel_end_point=1, **params):
 
         for eye in eyes:
             # get components
@@ -316,12 +314,14 @@ class CreateEye(Draw, Fill):
             # combine to animation group
             eye_creation = AnimationGroup((Show(*eyes, **params), (0, 0.01)),
                                           (fill_iris, (0.3, 1)), (draw_eyelids_and_eyeball, (0, 0.5)))
+            eye_creation_rescaled = AnimationGroup(
+                (eye_creation, (rel_start_point, rel_end_point)))
 
-        return eye_creation
+        return eye_creation_rescaled
 
 class UnCreateEye(Draw, Fill):
 
-    def __new__(cls, *eyes, **params):
+    def __new__(cls, *eyes, rel_start_point=0, rel_end_point=1, **params):
 
         for eye in eyes:
             # get components
@@ -335,8 +335,10 @@ class UnCreateEye(Draw, Fill):
             # combine to animation group
             eye_uncreation = AnimationGroup((Hide(*eyes, **params), (0.99, 1)),
                                             (unfill_iris, (0, 0.5)), (undraw_eyelids_and_eyeball, (0.3, 1)))
+            eye_uncreation_rescaled = AnimationGroup(
+                (eye_uncreation, (rel_start_point, rel_end_point)))
 
-        return eye_uncreation
+        return eye_uncreation_rescaled
 
 class CreateLogo(Draw, FadeIn):
 
