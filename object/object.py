@@ -64,7 +64,7 @@ class CObject():
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
     }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3, line_style="solid", stroke_order="long_short"):
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True):
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -89,8 +89,8 @@ class CObject():
 
         # set universal default params
         self.color = color
-        self.set_filler_mat(color=self.color)
-        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order)
+        self.set_filler_mat(color=self.color, fill=fill)
+        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order, intersection=intersection, intersects_with=intersects_with, contour=contour)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
         self.set_visibility()
@@ -98,7 +98,7 @@ class CObject():
         # set initial parameters
         # transform
         self.set_initial_params_object(self.transform(
-            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b))
+            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b, h_frozen=h_frozen, p_frozen=p_frozen, b_frozen=b_frozen))
         # fill
         self.set_initial_params_filler_material(
             self.fill(transparency=transparency, solid=solid))
@@ -120,26 +120,45 @@ class CObject():
             self.obj[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_OFF
             self.obj[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_OFF
 
-    def set_filler_mat(self, color=BLUE):
+    def set_filler_mat(self, color=BLUE, fill=None):
         # sets params of filler mat as a function of color
 
         self.filler_mat[c4d.MATERIAL_USE_COLOR] = False
         self.filler_mat[c4d.MATERIAL_USE_LUMINANCE] = True
         self.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR] = color
         self.filler_mat[c4d.MATERIAL_USE_TRANSPARENCY] = True
-        self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
+        # filling
+        if fill is None:
+            self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1
+        elif fill == "default":
+            self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = FILLER_TRANSPARENCY
+        else:
+            self.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS] = 1-fill
+
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
-    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3, line_style="solid", stroke_order="long_short"):
+    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3, line_style="solid", stroke_order="long_short", intersection=False, contour=True, intersects_with=None):
         # sets params of filler mat as a function of color
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
         self.sketch_mat[c4d.OUTLINEMAT_THICKNESS] = thickness
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_V] = self.sketch_mat
         self.sketch_tag[c4d.OUTLINEMAT_LINE_DEFAULT_MAT_H] = self.sketch_mat
-        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = False
-        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERSECTION] = intersection
+        if intersects_with is None:
+            self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 3
+        else:
+            self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS] = 4
+            # convert list to correct data type
+            intersection_objects = c4d.InExcludeData()
+            for intersection_object in intersects_with:
+                intersection_objects.InsertObject(intersection_object.obj, 1)
+            # insert list to tag
+            self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS_LIST] = intersection_objects
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_FOLD] = contour
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_CREASE] = contour
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_BORDER] = contour
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_AUTODRAW] = True
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0

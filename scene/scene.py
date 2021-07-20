@@ -18,7 +18,7 @@ class Scene():
     The scene class will create a new document, apply the sketch&toon shader and control all the render settings
     """
 
-    def __init__(self, imported=False, quality="normal"):
+    def __init__(self, imported=False, quality="default"):
 
         # scene-wide attributes
         self.time = 0
@@ -40,6 +40,9 @@ class Scene():
         # insert document in menu list
         if insert:
             c4doc.InsertBaseDocument(self.doc)
+        # timeline
+        self.time_ini = None
+        self.time_fin = None
         # render settings
         # get render data
         render_data = self.doc.GetActiveRenderData()
@@ -69,7 +72,7 @@ class Scene():
         elif quality == "low":
             render_data[c4d.RDATA_XRES] = 480
             render_data[c4d.RDATA_YRES] = 270
-        elif quality == "normal":
+        elif quality == "default":
             render_data[c4d.RDATA_XRES] = 1280
             render_data[c4d.RDATA_YRES] = 720
         elif quality == "high":
@@ -114,11 +117,36 @@ class Scene():
                           c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
         c4d.EventAdd()
 
+    def start(self):
+        # writes current time to variable for later use in finish method
+        self.time_ini = self.get_time()
+        print(self.time_ini.Get())
+
+    def stop(self):
+        # writes current time to variable for later use in finish method
+        self.time_fin = self.get_time()
+        print(self.time_fin.Get())
+
     def finish(self):
-        # set maximum time to time after last animation
-        self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
-        # set time to frame 0
-        self.set_time(0)
+        # set minimum time
+        if self.time_ini is not None:
+            self.doc[c4d.DOCUMENT_MINTIME] = self.time_ini
+            self.doc[c4d.DOCUMENT_LOOPMINTIME] = self.time_ini
+
+        # set maximum time
+        if self.time_fin is None:
+            self.doc[c4d.DOCUMENT_MAXTIME] = self.get_time()
+            self.doc[c4d.DOCUMENT_LOOPMAXTIME] = self.get_time()
+        else:
+            self.doc[c4d.DOCUMENT_MAXTIME] = self.time_fin
+            self.doc[c4d.DOCUMENT_LOOPMAXTIME] = self.time_fin
+
+        # set time
+        if self.time_ini is None:
+            # set time to zero
+            self.set_time(0)
+        else:
+            self.set_time(self.time_ini)
 
     def audio(self, path, offset=0):
         # adds audio to scene
@@ -610,6 +638,7 @@ class Scene():
 
         self.play(ChangeParams(self.camera, zoom=zoom,
                                smoothing=smoothing), run_time)
+
 
 class TwoDScene(Scene):
 
