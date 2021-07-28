@@ -5,7 +5,7 @@ from c4d.utils import SinCos
 
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
-
+c4d.MoText = 1019268  # add missing descriptor for MoText
 
 # TO DO: find proper solution for sketch material!
 
@@ -56,15 +56,30 @@ class CObject():
         "sketch_start_time": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ANIMATE_START, c4d.DTYPE_TIME, 0)),
         "sketch_resize_strokes": c4d.DescID(c4d.OUTLINEMAT_ADJUSTMENT_STROKE_RESIZE),
         "sketch_stroke_start": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_ADJUSTMENT_STROKESTART, c4d.DTYPE_REAL, 0)),
+        "sketch_color": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_COLOR, c4d.DTYPE_COLOR, 0)),
+        "sketch_color_r": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_R, c4d.DTYPE_REAL, 0)),
+        "sketch_color_g": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_G, c4d.DTYPE_REAL, 0)),
+        "sketch_color_b": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_B, c4d.DTYPE_REAL, 0)),
 
         # filler material
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
-        
+        "filler_color": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0)),
+        "filler_color_r": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_R, c4d.DTYPE_REAL, 0)),
+        "filler_color_g": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_G, c4d.DTYPE_REAL, 0)),
+        "filler_color_b": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+                                     c4d.DescLevel(c4d.COLOR_B, c4d.DTYPE_REAL, 0)),
+
         # visibility
         "vis_editor": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_EDITOR, c4d.DTYPE_LONG, 0)),
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
-    }
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=3, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True):
+        }
+
+    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=8, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True): 
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -138,7 +153,7 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
-    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=3, line_style="solid", stroke_order="long_short", intersection=False, contour=True, intersects_with=None):
+    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=5, line_style="solid", stroke_order="long_short", intersection=False, contour=True, intersects_with=None):
         # sets params of filler mat as a function of color
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
@@ -168,6 +183,7 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_ADV_SELFBLENDMODE] = 1  # self-blend average to handle overlapping
         self.sketch_mat[c4d.OUTLINEMAT_CONNECTIIONZ] = 3  # set Match to World to only connect strokes that touch
         self.sketch_mat[c4d.OUTLINEMAT_JOIN_ANGLE_LIMIT] = PI  # set Join Limit to 180° to connect strokes over all corners
+        self.sketch_mat[c4d.OUTLINEMAT_CLOSECONNECTION] = True  # set Join Limit to 180° to connect strokes over all corners
         # arrows
         if arrow_start:
             self.sketch_mat[c4d.OUTLINEMAT_LINESTART] = 4
@@ -210,14 +226,15 @@ class CObject():
 
         if len(descIds) == 0:
             return []
+
+        paramIds = []
         for descId in descIds:
-            if len(descId) == 1:
-                paramIds = [[descId[0].id] for descId in descIds]
-            elif len(descId) == 2:
-                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
-            elif len(descId) == 3:
-                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
-                            for descId in descIds]
+            if descId.GetDepth() == 1:
+                paramIds.append([descId[0].id])
+            elif descId.GetDepth() == 2:
+                paramIds.append([descId[0].id, descId[1].id])
+            elif descId.GetDepth() == 3:
+                paramIds.append([descId[0].id, descId[1].id, descId[2].id])
 
         return paramIds
 
@@ -374,7 +391,7 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", completion=None, absolute_opacity=None, draw_speed=None, erase=False, erase_amount=None):
+    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", color=None, completion=None, absolute_opacity=None, draw_speed=None, erase=False, erase_amount=None):
         # draw contours
 
         # dicts for options
@@ -394,7 +411,10 @@ class CObject():
             CObject.descIds["sketch_draw_speed"],
             CObject.descIds["sketch_start_time"],
             CObject.descIds["sketch_resize_strokes"],
-            CObject.descIds["sketch_stroke_start"]
+            CObject.descIds["sketch_stroke_start"],
+            CObject.descIds["sketch_color_r"],
+            CObject.descIds["sketch_color_g"],
+            CObject.descIds["sketch_color_b"]
         ]
 
         # create placeholder value for start_time, gets overwritten in play
@@ -403,8 +423,15 @@ class CObject():
         else:
             start_time = None
 
+        if color is None:
+            color_r = color_g = color_b = None
+        else:
+            color_r = color.x
+            color_g = color.y
+            color_b = color.z
+
         # determine default and input values
-        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time, erase, erase_amount]
+        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time, erase, erase_amount, color_r, color_g, color_b]
         default_values = self.get_current_values(descIds, mode="sketch")
 
         # filter out unchanged variables
@@ -490,8 +517,11 @@ class CObject():
 
 class SplineObject(CObject):
 
-    # metadata
-    ctype = "SplineObject"
+    try:
+        ctype
+    except: 
+        # metadata
+        ctype = "SplineObject"
 
     planes = {
         "XY": 0,
@@ -529,40 +559,49 @@ class SplineObject(CObject):
 class Spline(SplineObject):
 
     def __init__(self, points, spline_type="linear", closed=False, **params):
-        # convert into c4d vectors
-        point_vectors = []
-        for point in points:
-            point_vector = c4d.Vector(*point)
-            point_vectors.append(point_vector)
+        
+        if type(points) is list:
+            # convert into c4d vectors
+            point_vectors = []
+            for point in points:
+                point_vector = c4d.Vector(*point)
+                point_vectors.append(point_vector)
+    
+            # create object
+            self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
+        
+            # set points
+            self.obj.SetAllPoints(point_vectors)
+            # set interpolation
+            if spline_type == "linear":
+                self.obj[c4d.SPLINEOBJECT_TYPE] = 0
+            elif spline_type == "cubic":
+                self.obj[c4d.SPLINEOBJECT_TYPE] = 1
+            elif spline_type == "akima":
+                self.obj[c4d.SPLINEOBJECT_TYPE] = 2
+            elif spline_type == "b-spline":
+                self.obj[c4d.SPLINEOBJECT_TYPE] = 3
+            elif spline_type == "bezier":
+                self.obj[c4d.SPLINEOBJECT_TYPE] = 4
 
-        # create object
-        self.obj = c4d.SplineObject(len(point_vectors), c4d.SPLINETYPE_LINEAR)
-        # set points
-        self.obj.SetAllPoints(point_vectors)
-        # set interpolation
-        if spline_type == "linear":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 0
-        elif spline_type == "cubic":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 1
-        elif spline_type == "akima":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 2
-        elif spline_type == "b-spline":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 3
-        elif spline_type == "bezier":
-            self.obj[c4d.SPLINEOBJECT_TYPE] = 4
-
-        if closed:
-            # set spline to closed
-            self.obj[c4d.SPLINEOBJECT_CLOSED] = True
+            if closed:
+                # set spline to closed
+                self.obj[c4d.SPLINEOBJECT_CLOSED] = True
+                # execute SplineObject init
+                super(Spline, self).__init__(**params)
+            else:
+                # set ctype
+                self.ctype = "CObject"
+                # set spline to open
+                self.obj[c4d.SPLINEOBJECT_CLOSED] = False
+                # execute CObject init
+                super(SplineObject, self).__init__(**params)
+        elif type(points) is c4d.SplineObject:
+            spline_object = points
+            # write to object
+            self.obj = spline_object
             # execute SplineObject init
             super(Spline, self).__init__(**params)
-        else:
-            # set ctype
-            self.ctype = "CObject"
-            # set spline to open
-            self.obj[c4d.SPLINEOBJECT_CLOSED] = False
-            # execute CObject init
-            super(SplineObject, self).__init__(**params)
 
 class Rectangle(SplineObject):
 
@@ -779,17 +818,37 @@ class Cylinder(CObject):
 
 class Text(SplineObject):
 
-    def __init__(self, text, stroke_order="left_right", thickness=1, **params):
+    def __init__(self, text, stroke_order="left_right", thickness=1, height=100, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinetext)
 
         # set ideosynchratic default params
         self.obj[c4d.PRIM_TEXT_TEXT] = text
         self.obj[c4d.PRIM_TEXT_ALIGN] = 1
-        self.obj[c4d.PRIM_TEXT_HEIGHT] = 100.0
+        self.obj[c4d.PRIM_TEXT_HEIGHT] = height
 
         # run universal initialisation
         super(Text, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+
+class MoText(CObject):
+
+    # metadata
+    ctype = "MoText"
+
+    def __init__(self, text, stroke_order="left_right", thickness=1, height=100, **params):
+        # create object
+        self.obj = c4d.BaseObject(c4d.MoText)
+        # params for later use in scene
+        self.text = text
+        self.height = height
+
+        # set text
+        self.obj[c4d.PRIM_TEXT_TEXT] = self.text
+        self.obj[c4d.PRIM_TEXT_ALIGN] = 1
+        self.obj[c4d.PRIM_TEXT_HEIGHT] = self.height
+
+        # run universal initialisation
+        super(MoText, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
 
 class Plane(CObject):
 

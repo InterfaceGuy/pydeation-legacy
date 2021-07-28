@@ -56,6 +56,33 @@ class Animator():
 
         return flattened_cobjects
 
+
+class Domino():
+    # turns group animations into domino animations
+
+    def __new__(cls, group, animator, rel_duration="dynamic", **params):
+
+        number_children = len(group.children)
+
+        if rel_duration == "dynamic":
+            rel_run_times = [(1 / number_children * i, 1 / number_children * (i + 1))
+                             for i in range(number_children)]
+        else:
+            start_points = [i / number_children *
+                            (1 - rel_duration) for i in range(number_children)]
+            rel_run_times = [(start_point, start_point + rel_duration)
+                             for start_point in start_points]
+
+        animation_tuples = []
+
+        for child, rel_run_time in zip(group, rel_run_times):
+            animation_tuple = (animator(child, **params), rel_run_time)
+            animation_tuples.append(animation_tuple)
+
+        animation_group = AnimationGroup(*animation_tuples)
+
+        return animation_group
+
 class Show(Animator):
 
     def __new__(cls, *cobjects, **params):
@@ -161,6 +188,15 @@ class UnDraw(Animator):
             (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (completion, (0, 1)))
 
         return animations
+
+class ChangeColor(Animator):
+
+    def __new__(cls, *cobjects, color=None, **params):
+
+        change_color = Animator(
+            "sketch_animate", "sketch_type", *cobjects, color=color, **params)
+
+        return change_color
 
 class Fill(Animator):
 
@@ -300,6 +336,8 @@ class CreateEye(Draw, Fill):
 
     def __new__(cls, *eyes, rel_start_point=0, rel_end_point=1, **params):
 
+        eye_creations = []
+
         for eye in eyes:
             # get components
             iris = eye.components["iris"]
@@ -309,19 +347,22 @@ class CreateEye(Draw, Fill):
             # set initial parameters
             iris.set_initial_params_filler_material(iris.fill(transparency=1))
             # gather animations
-            fill_iris = Fill(iris, solid=True)
-            draw_eyelids_and_eyeball = Draw(eyelids, eyeball)
+            fill_iris = Fill(iris, solid=True, **params)
+            draw_eyelids_and_eyeball = Draw(eyelids, eyeball, **params)
             # combine to animation group
-            eye_creation = AnimationGroup((Show(*eyes, **params), (0, 0.01)),
+            eye_creation = AnimationGroup((Show(eye, **params), (0, 0.01)),
                                           (fill_iris, (0.3, 1)), (draw_eyelids_and_eyeball, (0, 0.5)))
             eye_creation_rescaled = AnimationGroup(
                 (eye_creation, (rel_start_point, rel_end_point)))
+            eye_creations.append(eye_creation_rescaled)
 
-        return eye_creation_rescaled
+        return eye_creations
 
 class UnCreateEye(Draw, Fill):
 
     def __new__(cls, *eyes, rel_start_point=0, rel_end_point=1, **params):
+
+        eye_uncreations = []
 
         for eye in eyes:
             # get components
@@ -331,52 +372,112 @@ class UnCreateEye(Draw, Fill):
             eyeball = eye.components["eyeball"]
             # gather animations
             unfill_iris = UnFill(iris)
-            undraw_eyelids_and_eyeball = UnDraw(eyelids, eyeball)
+            undraw_eyelids_and_eyeball = UnDraw(eyelids, eyeball, **params)
             # combine to animation group
-            eye_uncreation = AnimationGroup((Hide(*eyes, **params), (0.99, 1)),
+            eye_uncreation = AnimationGroup((Hide(eye, **params), (0.99, 1)),
                                             (unfill_iris, (0, 0.5)), (undraw_eyelids_and_eyeball, (0.3, 1)))
             eye_uncreation_rescaled = AnimationGroup(
                 (eye_uncreation, (rel_start_point, rel_end_point)))
+            eye_uncreations.append(eye_uncreation)
 
-        return eye_uncreation_rescaled
+        return eye_uncreations
 
 class CreateLogo(Draw, FadeIn):
 
     def __new__(cls, *logos, **params):
 
+        logo_creations = []
+
         for logo in logos:
             # get components
             main_circle = logo.components["main_circle"]
             small_circle = logo.components["small_circle"]
             lines = logo.components["lines"]
             # gather animations
-            draw_main_circle = Draw(main_circle)
-            draw_lines = Draw(lines)
-            fade_in_small_circle = FadeIn(small_circle)
+            draw_main_circle = Draw(main_circle, **params)
+            draw_lines = Draw(lines, **params)
+            fade_in_small_circle = FadeIn(small_circle, **params)
             # combine to animation group
-            logo_creation = AnimationGroup((Show(*logos, **params), (0, 0.01)),
+            logo_creation = AnimationGroup((Show(logo, **params), (0, 0.01)),
                                            (draw_main_circle, (0, 0.3)), (draw_lines, (0.3, 0.6)), (fade_in_small_circle, (0.6, 1)))
+            logo_creations.append(logo_creation)
 
-        return logo_creation
+        return logo_creations
 
 class UnCreateLogo(Draw, FadeIn):
 
     def __new__(cls, *logos, **params):
 
+        logo_uncreations = []
+
         for logo in logos:
             # get components
             main_circle = logo.components["main_circle"]
             small_circle = logo.components["small_circle"]
             lines = logo.components["lines"]
             # gather animations
-            undraw_main_circle = UnDraw(main_circle)
-            undraw_lines = UnDraw(lines)
-            fade_out_small_circle = FadeOut(small_circle)
+            undraw_main_circle = UnDraw(main_circle, **params)
+            undraw_lines = UnDraw(lines, **params)
+            fade_out_small_circle = FadeOut(small_circle, **params)
             # combine to animation group
-            logo_uncreation = AnimationGroup((Hide(*logos, **params), (0.99, 1)),
+            logo_uncreation = AnimationGroup((Hide(logo, **params), (0.99, 1)),
                                              (undraw_main_circle, (0.6, 1)), (undraw_lines, (0.3, 0.6)), (fade_out_small_circle, (0, 0.3)))
+            logo_uncreations.append(logo_uncreation)
 
-        return logo_uncreation
+        return logo_uncreations
+
+class CreateAxes(Draw):
+
+    def __new__(cls, *axess, rel_start_point=0, rel_end_point=1, **params):
+
+        axes_creations = []
+
+        for axes in axess:
+            # gather animations
+            draw_axes = [Draw(axis, **params)
+                         for axis in axes.components["axes"]]
+            if "ticks" in axes.components:
+                draw_ticks = [Domino(ticks, Draw, rel_duration=0.3, **params)
+                              for ticks in axes.components["ticks"]]
+                # combine to animation group
+                axes_creation = AnimationGroup((Show(axes, **params), (0, 0.01)),
+                                               (draw_axes, (0, 0.9)), (draw_ticks, (0.3, 1)))
+            else:
+                # combine to animation group
+                axes_creation = AnimationGroup((Show(axes, **params), (0, 0.01)),
+                                               (draw_axes, (0, 1)))
+            axes_creation_rescaled = AnimationGroup(
+                (axes_creation, (rel_start_point, rel_end_point)))
+            axes_creations.append(axes_creation_rescaled)
+
+        return axes_creations
+
+class UnCreateAxes(Draw):
+
+    def __new__(cls, *axess, rel_start_point=0, rel_end_point=1, **params):
+
+        axes_uncreations = []
+
+        for axes in axess:
+            # gather animations
+            erase_axes = [Erase(axis, **params)
+                          for axis in axes.components["axes"]]
+            if "ticks" in axes.components:
+                erase_ticks = [Domino(ticks, Erase, rel_duration=0.3, **params)
+                               for ticks in axes.components["ticks"]]
+                # combine to animation group
+                axes_uncreation = AnimationGroup((Hide(axes, **params), (0.99, 1)),
+                                                 (erase_axes, (0, 1)), (erase_ticks, (0, 0.7)))
+            else:
+                # combine to animation group
+                axes_uncreation = AnimationGroup((Hide(axes, **params), (0.99, 1)),
+                                                 (erase_axes, (0, 1)))
+            axes_uncreation_rescaled = AnimationGroup(
+                (axes_uncreation, (rel_start_point, rel_end_point)))
+            axes_uncreations.append(axes_uncreation_rescaled)
+
+        return axes_uncreations
+
 
 class Create(CreateEye):
 
@@ -391,6 +492,9 @@ class Create(CreateEye):
             elif cobject.__class__.__name__ == "Logo":
                 logo_creation = CreateLogo(cobject, **params)
                 creations.append(logo_creation)
+            elif cobject.__class__.__name__ == "Axes":
+                axes_creation = CreateAxes(cobject, **params)
+                creations.append(axes_creation)
             else:
                 generic_creation = Draw(cobject, **params)
                 creations.append(generic_creation)
@@ -401,20 +505,23 @@ class UnCreate(CreateEye):
 
     def __new__(cls, *cobjects, **params):
 
-        creations = []
+        uncreations = []
         # execute respective creation animator for cobjects
         for cobject in cobjects:
             if cobject.__class__.__name__ == "Eye":
                 eye_uncreation = UnCreateEye(cobject, **params)
-                creations.append(eye_uncreation)
+                uncreations.append(eye_uncreation)
             elif cobject.__class__.__name__ == "Logo":
-                logo_creation = CreateLogo(cobject, **params)
-                creations.append(logo_creation)
+                logo_uncreation = UnCreateLogo(cobject, **params)
+                uncreations.append(logo_uncreation)
+            elif cobject.__class__.__name__ == "Axes":
+                axes_uncreation = UnCreateAxes(cobject, **params)
+                uncreations.append(axes_uncreation)
             else:
-                generic_creation = UnDraw(cobject, **params)
-                creations.append(generic_creation)
+                generic_uncreation = UnDraw(cobject, **params)
+                uncreations.append(generic_uncreation)
 
-        return creations
+        return uncreations
 
 class MoveAlongSpline(Animator):
 

@@ -4,9 +4,11 @@ from pydeationlib.metadata import *
 from pydeationlib.animation.animator import *
 from pydeationlib.camera.camera import *
 from pydeationlib.object.custom_objects import Group
+from pydeationlib.object.object import Spline
 import os
 import c4d.documents as c4doc
 import c4d
+from c4d.utils import MatrixToHPB
 
 c4d.VPsketch = 1011015  # add missing descriptor for sketch render settings
 
@@ -117,15 +119,13 @@ class Scene():
                           c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
         c4d.EventAdd()
 
-    def start(self):
+    def START(self):
         # writes current time to variable for later use in finish method
         self.time_ini = self.get_time()
-        print(self.time_ini.Get())
 
-    def stop(self):
+    def STOP(self):
         # writes current time to variable for later use in finish method
         self.time_fin = self.get_time()
-        print(self.time_fin.Get())
 
     def finish(self):
         # set minimum time
@@ -292,6 +292,66 @@ class Scene():
                 # insert spline object under group object
                 component.obj.InsertUnder(custom_object.obj)
 
+    def add_to_kairos_motext(self, motext):
+        # handles kairos for spline objects
+
+        # check if already in kairos
+        if (motext in self.kairos):
+            pass
+        else:
+            # add object to kairos
+            self.doc.InsertObject(motext.obj)
+            # make editable
+            motext_editable = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_MAKEEDITABLE, list=[
+                                                            motext.obj], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+            # unpack function
+
+            def unpack(parent_list):
+                children = []
+                for parent in parent_list:
+                    for child in parent.GetChildren():
+                        children.append(child)
+                return children
+
+            # unpack elements
+            text = unpack(motext_editable)
+            lines = unpack(text)
+            words = unpack(lines)
+            letters = unpack(words)
+            splines = unpack(letters)
+
+            # convert to pydeation splines
+            pydeation_splines = []
+            for spline in splines:
+                # get coordinates
+                # matrix
+                matrix = spline.GetMg()
+                # position
+                x, y, z = matrix.off.x, matrix.off.y, matrix.off.z
+                # rotation
+                h, p, b = MatrixToHPB(matrix).x, MatrixToHPB(
+                    matrix).y, MatrixToHPB(matrix).z
+                # scale
+                scale_x, scale_y, scale_z = matrix.GetScale(
+                ).x, matrix.GetScale().y, matrix.GetScale().z
+                # create pydeation spline
+                spline = Spline(spline, x=x, y=y, z=z, h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
+                                scale_z=scale_z)
+                pydeation_splines.append(spline)
+            # create group from splines
+            spline_text = Group(*pydeation_splines,
+                                group_name=motext.text, h=PI, p=PI / 2)
+
+            # add group
+            self.add_to_kairos_group(spline_text)
+
+            # add motext to kairos list
+            self.kairos.append(motext)
+            # update cinema
+            c4d.EventAdd()
+
+            return spline_text
+
     def add(self, *cobjects):
         # checks whether object is in kairos and if not adds it
         for cobject in cobjects:
@@ -320,6 +380,10 @@ class Scene():
                     elif cobject.ctype == "SplineObject":
                         # add spline object to kairos
                         self.add_to_kairos_spline_object(cobject)
+                    elif cobject.ctype == "MoText":
+                        # add motext to kairos and return spline object
+                        spline_text = self.add_to_kairos_motext(cobject)
+                        return spline_text
                     # camera object
                     elif cobject.ctype == "Camera":
                         # add camera object to kairos
@@ -374,17 +438,18 @@ class Scene():
     @staticmethod
     def descs_to_params(descIds):
         # turns descIds into paramIds
+
         if len(descIds) == 0:
             return []
+
+        paramIds = []
         for descId in descIds:
-            if len(descId) == 1:
-                # ADDED LIST BRACKETS AS QUICK FIX FOR CHECKING FOR MULTIPLICATIVE PARAMS - MIGHT CAUSE PROBLEMS IN THE FUTURE!
-                paramIds = [[descId[0].id] for descId in descIds]
-            elif len(descId) == 2:
-                paramIds = [[descId[0].id, descId[1].id] for descId in descIds]
-            elif len(descId) == 3:
-                paramIds = [[descId[0].id, descId[1].id, descId[2].id]
-                            for descId in descIds]
+            if descId.GetDepth() == 1:
+                paramIds.append([descId[0].id])
+            elif descId.GetDepth() == 2:
+                paramIds.append([descId[0].id, descId[1].id])
+            elif descId.GetDepth() == 3:
+                paramIds.append([descId[0].id, descId[1].id, descId[2].id])
 
         return paramIds
 
@@ -428,14 +493,14 @@ class Scene():
             if smoothing_right is not None:
                 key.SetTimeLeft(
                     curve, c4d.BaseTime(-smoothing_right * run_time))
-            if type(value) in (int, c4d.BaseTime):
+            if type(value) in (int, c4d.BaseTime, c4d.Vector):
                 key.SetGeData(curve, value)
             elif type(value) is float:
                 key.SetValue(curve, value)
                 key.SetValueRight(curve, 0)
                 key.SetValueLeft(curve, 0)
             else:
-                raise TypeError("value type must be int or float")
+                raise TypeError(f"{type(value)} is not a valid value type")
 
         c4d.EventAdd()
 
@@ -630,7 +695,6 @@ class Scene():
     def set(self, *transformations):
         # sets object to end state of animation without playing it
 
-        fps = self.doc.GetFps()
         self.play(*transformations, run_time=1, in_frames=True)
 
     def zoom(self, zoom, run_time=1, smoothing=0.25):
@@ -653,5 +717,5 @@ class ThreeDScene(Scene):
         # define 3d camera
         self.camera = ThreeDCamera()
         self.camera_group = Group(
-            self.camera, group_name="Camera", b=PI / 4)
+            self.camera, group_name="Camera", h=PI / 16, p=-PI / 16, b=PI / 4)
         super(ThreeDScene, self).__init__(**params)

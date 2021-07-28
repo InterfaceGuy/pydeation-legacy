@@ -55,6 +55,7 @@ class AnimationGroup():
         # rescale run times and save rescaled animations
         self.animations = self.rescale_run_times()
         self.category = "neutral"
+        self.cobjects = self.get_cobjects()
 
     def __iter__(self):
         self.idx = 0
@@ -62,52 +63,74 @@ class AnimationGroup():
 
     def __next__(self):
         if self.idx < len(self.animations):
-            result = self.animations[self.idx]
+            animation = self.animations[self.idx]
             self.idx += 1
-            return result
+            return animation
         else:
             raise StopIteration
 
     def get_cobjects(self):
         # returns the cobjects of animation group
 
-        cobjects = []
-        cobjects = self.cobject_recursion(cobjects)
+        def recursion(*rel_animations_tuples, cobjects=[]):
 
-        return cobjects
+            for rel_animations_tuple in rel_animations_tuples:
+                # unpack animation
+                animations, rel_run_time = rel_animations_tuple
+                if isinstance(animations, Animation):
+                    animation = animations
+                    # read in cobject
+                    cobject = animation.cobject
+                    # append cobject
+                    cobjects.append(cobject)
+                else:
+                    for animation in animations:
+                        if isinstance(animations, Animation):
+                            animation = animations
+                            # read in cobject
+                            cobject = animation.cobject
+                            # append cobject
+                            cobjects.append(cobject)
+                        else:
+                            # feed back into recursion
+                            recursion((animation, rel_run_time),
+                                      cobjects=cobjects)
 
-    def cobject_recursion(self, cobjects):
+            return cobjects
 
-        for rel_animations_tuple in self.rel_animations_tuples:
-            animation = rel_animations_tuple[0]
-            if isinstance(animation, Animation):
-                cobject = animation.cobject
-                cobjects.append(cobject)
-            elif isinstance(animation, AnimationGroup):
-                group_cobjects = self.get_cobjects(AnimationGroup)
-                cobjects + group_cobjects
+        cobjects = recursion(*self.rel_animations_tuples)
 
         return cobjects
 
     def rescale_run_times(self):
         # rescale animation run times
 
-        rescaled_animations = []
-        # unpack relative animations tuples
-        for animations, rel_run_time in self.rel_animations_tuples:
-            # unpack animations
-            if isinstance(animations, Animation):
-                animation = animations
-                # rescale animation run time with run time from tuple
-                animation.rescale_run_time(rel_run_time)
-                # append rescaled animations
-                rescaled_animations.append(animation)
-            else:
-                for animation in animations:
+        def recursion(*rel_animations_tuples, rescaled_animations=[]):
+            # unpack relative animations tuples
+            for animations, rel_run_time in rel_animations_tuples:
+                # unpack animations
+                if isinstance(animations, Animation):
+                    animation = animations
                     # rescale animation run time with run time from tuple
                     animation.rescale_run_time(rel_run_time)
                     # append rescaled animations
                     rescaled_animations.append(animation)
+                else:
+                    for animation in animations:
+                        if isinstance(animations, Animation):
+                            animation = animations
+                            # rescale animation run time with run time from tuple
+                            animation.rescale_run_time(rel_run_time)
+                            # append rescaled animations
+                            rescaled_animations.append(animation)
+                        else:
+                            # feed back into recursion
+                            recursion((animation, rel_run_time),
+                                      rescaled_animations=rescaled_animations)
+
+            return rescaled_animations
+
+        rescaled_animations = recursion(*self.rel_animations_tuples)
 
         return rescaled_animations
 
