@@ -56,6 +56,7 @@ class AnimationGroup():
         self.animations = self.rescale_run_times()
         self.category = "neutral"
         self.cobjects = self.get_cobjects()
+        self.params = None
 
     def __iter__(self):
         self.idx = 0

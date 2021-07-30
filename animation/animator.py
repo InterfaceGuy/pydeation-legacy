@@ -1,6 +1,7 @@
 from pydeationlib.animation.animation import *
 from pydeationlib.constants import *
 import c4d
+from c4d.utils import SinCos
 
 
 class Animator():
@@ -28,9 +29,7 @@ class Animator():
     def flatten_input(*cobjects, transform_group_object=False):
         # checks for groups and flattens list
 
-        flattened_cobjects = []
-
-        def flatten_recursion(*cobjects, transform_group_object=False):
+        def flatten_recursion(*cobjects, transform_group_object=False, flattened_cobjects=[]):
             # subfunction to be used recursively in order to unpack nested groups
             for cobject in cobjects:
                 if cobject.ctype == "Group":
@@ -38,14 +37,14 @@ class Animator():
                         flattened_cobjects.append(cobject)
                         continue
                     for child in cobject.children:
-                        flatten_recursion(child)
+                        flatten_recursion(child, flattened_cobjects=flattened_cobjects)
                     continue
                 elif cobject.ctype == "CustomObject":
                     if transform_group_object:
                         flattened_cobjects.append(cobject)
                         continue
                     for component in cobject.components.values():
-                        flatten_recursion(component)
+                        flatten_recursion(component, flattened_cobjects=flattened_cobjects)
                     continue
                 flattened_cobjects.append(cobject)
 
@@ -60,19 +59,32 @@ class Animator():
 class Domino():
     # turns group animations into domino animations
 
-    def __new__(cls, group, animator, rel_duration="dynamic", **params):
+    def __new__(cls, group, animator, rel_duration="dynamic", rel_overlap=0.5, global_smoothing=0, **params):
 
         number_children = len(group.children)
 
         if rel_duration == "dynamic":
-            rel_run_times = [(1 / number_children * i, 1 / number_children * (i + 1))
-                             for i in range(number_children)]
-        else:
-            start_points = [i / number_children *
-                            (1 - rel_duration) for i in range(number_children)]
-            rel_run_times = [(start_point, start_point + rel_duration)
-                             for start_point in start_points]
+            # relative duration is calculated from relative overlap
+            rel_duration = 1 / (number_children * (1 - rel_overlap) + 1)
 
+        # start points of relative run times are calculated and adjusted for global_smoothing
+        start_points = [i / number_children *
+                        (1 - rel_duration) + global_smoothing/(2*PI) * SinCos(2*PI*i/number_children)[0] for i in range(number_children)]
+        # relative run times length are adjusted for global_smoothing
+        rel_run_times = [[start_point - (rel_duration * (1 + global_smoothing * SinCos(2*PI*i/number_children)[1]))/2, start_point + (rel_duration * (1 + global_smoothing * SinCos(2*PI*i/number_children)[1]))/2]
+                         for i, start_point in enumerate(start_points)]
+        # correct for overshooting
+        # move all run times to match beginning
+        diff_ini = abs(rel_run_times[0][0])
+        for rel_run_time in rel_run_times:
+            rel_run_time[0] = rel_run_time[0] + diff_ini
+            rel_run_time[1] = rel_run_time[1] + diff_ini
+        # rescale run times to match end
+        diff_fin = 1 - rel_run_times[-1][-1]
+        for rel_run_time in rel_run_times:
+            rel_run_time[0] = rel_run_time[0] * (1 + diff_fin)
+            rel_run_time[1] = rel_run_time[1] * (1 + diff_fin)
+        
         animation_tuples = []
 
         for child, rel_run_time in zip(group, rel_run_times):
@@ -80,8 +92,27 @@ class Domino():
             animation_tuples.append(animation_tuple)
 
         animation_group = AnimationGroup(*animation_tuples)
+        
+        animation_group.params = params
+        animation_group.category = animator.category
 
         return animation_group
+
+class Write():
+    # writes text
+
+    def __new__(cls, *custom_texts, rel_duration="dynamic", rel_overlap=0.7, global_smoothing=0.5, smoothing=0, **params):
+
+        animations = []
+        for custom_text in custom_texts:
+            # unpack text
+            text = custom_text.components["text"]
+            # create domino animation
+            animation = Domino(text, DrawThenFillCompletely, rel_overlap=0.7, global_smoothing=global_smoothing, smoothing=0)
+            animations.append(animation)
+
+        return animations
+
 
 class Show(Animator):
 
@@ -111,6 +142,8 @@ class Hide(Animator):
 
 class Draw(Animator):
 
+    category = "constructive"
+
     def __new__(cls, *cobjects, completion=1.0, stroke_order=None, stroke_method="single", **params):
 
         set_options_ini = Animator(
@@ -118,8 +151,11 @@ class Draw(Animator):
         drawing = Animator(
             "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
 
-        animations = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (set_options_ini, (0, 0.01)), (drawing, (0.01, 0.99)))
+        animations = AnimationGroup((set_options_ini, (0, 0.01)), (drawing, (0.01, 1)))
+
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
 
         return animations
 
@@ -177,6 +213,8 @@ class DrawSteady(Animator):
 
 class UnDraw(Animator):
 
+    category = "destructive"
+
     def __new__(cls, *cobjects, completion=0, stroke_order=None, stroke_method="single", **params):
 
         set_options = Animator(
@@ -184,8 +222,11 @@ class UnDraw(Animator):
         completion = Animator(
             "sketch_animate", "sketch_type", *cobjects, completion=completion, **params)
 
-        animations = AnimationGroup(
-            (Hide(*cobjects, **params), (0.99, 1)), (set_options, (0, 0.01)), (completion, (0, 1)))
+        animations = AnimationGroup((set_options, (0, 0.01)), (completion, (0, 1)))
+
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
 
         return animations
 
@@ -200,12 +241,17 @@ class ChangeColor(Animator):
 
 class Fill(Animator):
 
+    category = "constructive"
+
     def __new__(cls, *cobjects, solid=False, transparency=FILLER_TRANSPARENCY, **params):
 
         fill_animations = Animator(
             "fill", "fill_type", *cobjects, solid=solid, transparency=transparency, **params)
-        animations = AnimationGroup(
-            (Show(*cobjects, **params), (0, 0.01)), (fill_animations, (0, 1)))
+        animations = AnimationGroup((fill_animations, (0, 1)))
+
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
 
         return animations
 
@@ -266,16 +312,22 @@ class DrawThenFill(Draw, Fill):
 
 class DrawThenFillCompletely(Draw, Fill):
 
+    category = "constructive"
+
     def __new__(cls, *cobjects, **params):
 
         draw_animations = Draw(*cobjects, **params)
         fill_animations = Fill(
             solid=True, *cobjects, **params)
 
-        draw_then_fill_animation_group = AnimationGroup(
+        animations = AnimationGroup(
             (draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
 
-        return draw_then_fill_animation_group
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
+
+        return animations
 
 class UnDrawThenUnFill(UnDraw, UnFill, Hide):
 

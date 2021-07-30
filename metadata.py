@@ -1,3 +1,3 @@
-THINKER = "DanielSchmachtenberger"
-CATEGORY = "clips"
-PROJECT_NAME = "NavigatingReality"
+THINKER = "InterfaceGuy"
+CATEGORY = "diverse"
+PROJECT_NAME = "testProject"

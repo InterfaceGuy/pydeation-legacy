@@ -293,3 +293,19 @@ class Axes(CustomObject):
             }
 
         super(Axes, self).__init__(**params)
+
+
+class CustomText(CustomObject):
+    # custom text derived from motext using
+
+    custom_object_name = "CustomText"
+
+    def __init__(self, letters, **params):
+
+        # create group from lines
+        text = Group(*letters, group_name="text")
+
+        self.components = {
+            "text": text
+        }
+        super(CustomText, self).__init__(**params)

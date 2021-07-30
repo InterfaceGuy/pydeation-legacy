@@ -79,7 +79,7 @@ class CObject():
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
         }
 
-    def __init__(self, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=8, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True): 
+    def __init__(self, show=False, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=8, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True): 
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -108,12 +108,14 @@ class CObject():
         self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order, intersection=intersection, intersects_with=intersects_with, contour=contour)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
-        self.set_visibility()
+
 
         # set initial parameters
+        # visibility
+        self.set_visibility(show=show)
         # transform
         self.set_initial_params_object(self.transform(
-            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b, h_frozen=h_frozen, p_frozen=p_frozen, b_frozen=b_frozen))
+            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b, h_frozen=h_frozen, p_frozen=p_frozen, b_frozen=b_frozen, relative=False))
         # fill
         self.set_initial_params_filler_material(
             self.fill(transparency=transparency, solid=solid))
@@ -599,7 +601,7 @@ class Spline(SplineObject):
         elif type(points) is c4d.SplineObject:
             spline_object = points
             # write to object
-            self.obj = spline_object
+            self.obj = spline_object.GetClone()
             # execute SplineObject init
             super(Spline, self).__init__(**params)
 
@@ -818,17 +820,31 @@ class Cylinder(CObject):
 
 class Text(SplineObject):
 
-    def __init__(self, text, stroke_order="left_right", thickness=1, height=100, **params):
+    def __init__(self, text, spline_only=False, stroke_order="left_right", thickness=2, height=100, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinetext)
 
-        # set ideosynchratic default params
-        self.obj[c4d.PRIM_TEXT_TEXT] = text
-        self.obj[c4d.PRIM_TEXT_ALIGN] = 1
-        self.obj[c4d.PRIM_TEXT_HEIGHT] = height
+        # params for later use in scene
+        self.text = text
+        self.height = height
+        self.params = params
 
-        # run universal initialisation
-        super(Text, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+        # set ideosynchratic default params
+        self.obj[c4d.PRIM_TEXT_TEXT] = self.text
+        self.obj[c4d.PRIM_TEXT_HEIGHT] = self.height
+        self.obj[c4d.PRIM_TEXT_ALIGN] = 1
+        self.obj[c4d.PRIM_TEXT_SEPARATE] = True
+
+        if spline_only:
+            # set ctype
+            self.ctype = "CObject"
+            # set plane
+            self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
+            # run universal initialisation
+            super(SplineObject, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+        else:
+            # run universal initialisation
+            super(Text, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
 
 class MoText(CObject):
 
@@ -838,6 +854,7 @@ class MoText(CObject):
     def __init__(self, text, stroke_order="left_right", thickness=1, height=100, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.MoText)
+        
         # params for later use in scene
         self.text = text
         self.height = height
@@ -849,6 +866,21 @@ class MoText(CObject):
 
         # run universal initialisation
         super(MoText, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+
+class Formula(SplineObject):
+
+    def __init__(self, formula="Sin(t)", t_min=-1, t_max=1, **params):
+        # create object
+        self.obj = c4d.BaseObject(c4d.Osplineformula)
+
+        # set formula
+        self.obj[c4d.PRIM_FORMULA_X] = f"100*t"
+        self.obj[c4d.PRIM_FORMULA_Y] = f"100*{formula}"
+        self.obj[c4d.PRIM_FORMULA_TMIN] = f"{t_min}"
+        self.obj[c4d.PRIM_FORMULA_TMAX] = f"{t_max}"
+
+        # run universal initialisation
+        super(Formula, self).__init__(**params)
 
 class Plane(CObject):
 

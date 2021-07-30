@@ -3,7 +3,7 @@ from pydeationlib.constants import *
 from pydeationlib.metadata import *
 from pydeationlib.animation.animator import *
 from pydeationlib.camera.camera import *
-from pydeationlib.object.custom_objects import Group
+from pydeationlib.object.custom_objects import Group, CustomText
 from pydeationlib.object.object import Spline
 import os
 import c4d.documents as c4doc
@@ -314,12 +314,11 @@ class Scene():
                 return children
 
             # unpack elements
-            text = unpack(motext_editable)
+            text = motext_editable
             lines = unpack(text)
             words = unpack(lines)
             letters = unpack(words)
             splines = unpack(letters)
-
             # convert to pydeation splines
             pydeation_splines = []
             for spline in splines:
@@ -351,6 +350,100 @@ class Scene():
             c4d.EventAdd()
 
             return spline_text
+
+    def text(self, text):
+        # converts text object into single lines with pydeation spline objects and adds to kairos
+
+        # check if already in kairos
+        if (text in self.kairos):
+            pass
+        else:
+            # add object to kairos
+            # self.doc.InsertObject(text.obj)
+            # make editable
+            text_editable = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_MAKEEDITABLE, list=[
+                text.obj], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+            # unpack
+
+            def unpack(parent):
+                children = []
+                for child in parent.GetChildren():
+                    children.append(child)
+                return children
+
+            # check if new lines present
+            def has_lines(text):
+                if "\n" in text.text:
+                    return True
+                else:
+                    return False
+
+            # unpack elements
+            if has_lines(text):
+                # unpack lines
+                lines = unpack(*text_editable)
+                # convert to pydeation lines
+                pydeation_lines = []
+                pydeation_letters = []
+                for i, line in enumerate(lines):
+                    # unpack letters
+                    letters = unpack(line)
+                    # convert to pydeation letters
+                    for letter in letters:
+                        # get coordinates
+                        # matrix
+                        matrix = letter.GetMg()
+                        # position
+                        x, y, z = matrix.off.x, matrix.off.y, matrix.off.z
+                        # rotation
+                        h, p, b = MatrixToHPB(matrix).x, MatrixToHPB(
+                            matrix).y, MatrixToHPB(matrix).z
+                        # scale
+                        scale_x, scale_y, scale_z = matrix.GetScale(
+                        ).x, matrix.GetScale().y, matrix.GetScale().z
+                        # create pydeation letter
+                        pydeation_letter = Spline(letter, x=x, y=y, z=z, h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
+                                                  scale_z=scale_z, thickness=2, stroke_order="left_right")
+                        pydeation_letters.append(
+                            pydeation_letter)
+                # create text from letters
+                # correct for rotation bug
+                pydeation_text = CustomText(
+                    pydeation_letters, p=-PI / 2, **text.params)
+
+            else:
+                # unpack letters
+                letters = unpack(*text_editable)
+                # convert to pydeation letters
+                pydeation_letters = []
+                for letter in letters:
+                    # get coordinates
+                        # matrix
+                    matrix = letter.GetMg()
+                    # position
+                    x, y, z = matrix.off.x, matrix.off.y, matrix.off.z
+                    # rotation
+                    h, p, b = MatrixToHPB(matrix).x, MatrixToHPB(
+                        matrix).y, MatrixToHPB(matrix).z
+                    # scale
+                    scale_x, scale_y, scale_z = matrix.GetScale(
+                    ).x, matrix.GetScale().y, matrix.GetScale().z
+                    # create pydeation letter
+                    pydeation_letter = Spline(letter, x=x, y=y, z=z, h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
+                                              scale_z=scale_z, thickness=2, stroke_order="left_right")
+                    pydeation_letters.append(pydeation_letter)
+                # create text from letters
+                pydeation_text = CustomText(pydeation_letters, **text.params)
+
+            # add group
+            self.add_to_kairos_custom_object(pydeation_text)
+
+            # add text to kairos list
+            self.kairos.append(text)
+            # update cinema
+            c4d.EventAdd()
+
+            return pydeation_text
 
     def add(self, *cobjects):
         # checks whether object is in kairos and if not adds it
@@ -554,11 +647,30 @@ class Scene():
     def flatten_animations(self, item_list):
         # unpacks animation groups inside tuple and adds cobjects to scene
 
-        # define list for unpacked animations
-        animations_list = []
+        def complete_animations(animation_group):
+            # adds show or hide depending on animation category
+            if animation_group.category == "neutral":
+                print(animation_group.category, animation_group)
+                return animation_group
+            elif animation_group.category == "constructive":
+                print(animation_group.category, animation_group)
+                animation_group.category = "neutral"
+                cobjects = animation_group.cobjects
+                params = animation_group.params
+                animation_group = AnimationGroup(
+                    (Show(*cobjects, **params), (0, 0.01)), (animation_group, (0, 1)))
+                return animation_group
+            elif animation_group.category == "destructive":
+                print(animation_group.category, animation_group)
+                animation_group.category = "neutral"
+                cobjects = animation_group.cobjects
+                params = animation_group.params
+                animation_group = AnimationGroup(
+                    (Hide(*cobjects, **params), (0.99, 1)), (animation_group, (0, 1)))
+                return animation_group
 
         # function for recursive application
-        def process(item_list):
+        def flatten_recursion(item_list, animations_list=[]):
             # discern between types
             for item in item_list:
                 # individual animation
@@ -568,17 +680,22 @@ class Scene():
                 # animation group
                 elif isinstance(item, AnimationGroup):
                     animation_group = item
+                    # complete animations depending on category
+                    animation_group = complete_animations(animation_group)
                     # unpack animations and append
-                    for animation in animation_group.animations:
+                    for animation in animation_group:
                         animations_list.append(animation)
                 # list of animations/animation groups
                 elif type(item) is list:
                     item_list = item
                     # feed back into method
-                    process(item_list)
+                    flatten_recursion(
+                        item_list, animations_list=animations_list)
+
+            return animations_list
 
         # apply function
-        process(item_list)
+        animations_list = flatten_recursion(item_list)
 
         return animations_list
 
@@ -634,6 +751,9 @@ class Scene():
 
     def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
+
+        # complete animations
+        # self.complete_animations(*animations)
 
         # set initial keyframes
         # unpack animation groups inside tuple
