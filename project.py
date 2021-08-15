@@ -7,7 +7,7 @@ import os
 class Project():
 
     # file path
-    file = "/Users/davidrug/Library/Preferences/Maxon/python37/libs/pydeationlib/metadata.py"
+    file = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R24_36E19156/python39/libs/pydeationlib/metadata.py"
 
     def __new__(self, thinker="InterfaceGuy", category="diverse", name="testProject"):
         # writes metadata to file

@@ -1,3 +1,3 @@
 THINKER = "InterfaceGuy"
 CATEGORY = "diverse"
-PROJECT_NAME = "testProject"
+PROJECT_NAME = "Intro"

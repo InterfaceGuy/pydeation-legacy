@@ -186,15 +186,19 @@ class CObject():
         self.sketch_mat[c4d.OUTLINEMAT_CONNECTIIONZ] = 3  # set Match to World to only connect strokes that touch
         self.sketch_mat[c4d.OUTLINEMAT_JOIN_ANGLE_LIMIT] = PI  # set Join Limit to 180° to connect strokes over all corners
         self.sketch_mat[c4d.OUTLINEMAT_CLOSECONNECTION] = True  # set Join Limit to 180° to connect strokes over all corners
+        # perspective
+        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS_DISTANCE] = True  # enable rescaling by distance
+        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS_DISTANCE_STRENGTH] = 0.6  # set strength to 60%
+        self.sketch_mat[c4d.OUTLINEMAT_THICKNESS_DISTANCE_RANGE] = 1  # select camera mode
         # arrows
         if arrow_start:
             self.sketch_mat[c4d.OUTLINEMAT_LINESTART] = 4
         if arrow_end:
             self.sketch_mat[c4d.OUTLINEMAT_LINEEND] = 4
         self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_WIDTH] = 7
-        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_HEIGHT] = 7
+        self.sketch_mat[c4d.OUTLINEMAT_STARTCAP_HEIGHT] = 5
         self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_WIDTH] = 7
-        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_HEIGHT] = 7
+        self.sketch_mat[c4d.OUTLINEMAT_ENDCAP_HEIGHT] = 5
         # line style
         self.sketch_mat[c4d.OUTLINEMAT_PATTERN] = 1
         if line_style == "solid":
@@ -262,10 +266,10 @@ class CObject():
         # abstract animation method that calls specific animations using animation_name
 
         # check value for relative delay, cut off
-        if rel_start_point < 0 or rel_start_point > 1:
-            raise ValueError("relative delay must be between 0-1!")
-        if rel_end_point < 0 or rel_end_point > 1:
-            raise ValueError("relative cut off must be between 0-1!")
+        #if rel_start_point < 0 or rel_start_point > 1:
+         #   raise ValueError("relative delay must be between 0-1!")
+        #if rel_end_point < 0 or rel_end_point > 1:
+         #   raise ValueError("relative cut off must be between 0-1!")
 
         values, descIds = getattr(self, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
@@ -820,7 +824,7 @@ class Cylinder(CObject):
 
 class Text(SplineObject):
 
-    def __init__(self, text, spline_only=False, stroke_order="left_right", thickness=2, height=100, **params):
+    def __init__(self, text, spline_only=False, stroke_order="left_right", thickness=2, height=50, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinetext)
 

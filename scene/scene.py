@@ -47,11 +47,11 @@ class Scene():
         self.time_fin = None
         # render settings
         # get render data
-        render_data = self.doc.GetActiveRenderData()
+        self.render_data = self.doc.GetActiveRenderData()
         # create sketch setting
         sketch_vp = c4doc.BaseVideoPost(c4d.VPsketch)
         # insert sketch setting
-        render_data.InsertVideoPost(sketch_vp)
+        self.render_data.InsertVideoPost(sketch_vp)
         # set sketch params
         sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
         sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
@@ -64,25 +64,25 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_EDLINES_REDRAW_FULL] = True
         sketch_vp[c4d.OUTLINEMAT_LINE_SPLINES] = True
         # set general render params
-        render_data[c4d.RDATA_FRAMESEQUENCE] = 3
-        render_data[c4d.RDATA_SAVEIMAGE] = False
-        render_data[c4d.RDATA_FORMAT] = c4d.RDATA_SAVE_FORMAT_MP4
+        self.render_data[c4d.RDATA_FRAMESEQUENCE] = 3
+        self.render_data[c4d.RDATA_SAVEIMAGE] = False
+        self.render_data[c4d.RDATA_FORMAT] = c4d.RDATA_SAVE_FORMAT_MP4
         # set quality
         if quality == "verylow":
-            render_data[c4d.RDATA_XRES] = 320
-            render_data[c4d.RDATA_YRES] = 180
+            self.render_data[c4d.RDATA_XRES] = 320
+            self.render_data[c4d.RDATA_YRES] = 180
         elif quality == "low":
-            render_data[c4d.RDATA_XRES] = 480
-            render_data[c4d.RDATA_YRES] = 270
+            self.render_data[c4d.RDATA_XRES] = 480
+            self.render_data[c4d.RDATA_YRES] = 270
         elif quality == "default":
-            render_data[c4d.RDATA_XRES] = 1280
-            render_data[c4d.RDATA_YRES] = 720
+            self.render_data[c4d.RDATA_XRES] = 1280
+            self.render_data[c4d.RDATA_YRES] = 720
         elif quality == "high":
-            render_data[c4d.RDATA_XRES] = 2560
-            render_data[c4d.RDATA_YRES] = 1440
+            self.render_data[c4d.RDATA_XRES] = 2560
+            self.render_data[c4d.RDATA_YRES] = 1440
         elif quality == "veryhigh":
-            render_data[c4d.RDATA_XRES] = 3840
-            render_data[c4d.RDATA_YRES] = 2160
+            self.render_data[c4d.RDATA_XRES] = 3840
+            self.render_data[c4d.RDATA_YRES] = 2160
         # add camera
         self.add(self.camera)
         # set view to camera
@@ -118,6 +118,18 @@ class Scene():
         c4doc.SaveProject(self.doc, c4d.SAVEPROJECT_ASSETS |
                           c4d.SAVEPROJECT_SCENEFILE, self.scene_path, [], [])
         c4d.EventAdd()
+
+    def render(self):
+        # this gives us the path of the project to store the individual renders in
+        self.project_path = os.path.join(
+            PROJECTS_PATH, self.category, self.thinker, self.project_name)
+        self.scene_path = os.path.join(self.scene_path, self.scene_name)
+        # define render output path
+        self.render_data[c4d.RDATA_SAVEIMAGE] = True
+        self.render_data[c4d.RDATA_PATH] = self.scene_path
+        # renders scene to picture viewer
+        c4d.CallCommand(465003525)  # Add to Render Queue...
+        c4d.CallCommand(465003513)  # Start Rendering
 
     def START(self):
         # writes current time to variable for later use in finish method
@@ -167,7 +179,7 @@ class Scene():
 
         # insert audio to track
         audio[c4d.CID_SOUND_NAME] = path
-        audio[c4d.CID_SOUND_START] = c4d.BaseTime(offset)
+        audio[c4d.CID_SOUND_START] = c4d.BaseTime(-offset)
 
     def add_to_kairos_cobject(self, cobject):
         # handles kairos for cobjects
@@ -582,7 +594,7 @@ class Scene():
             # override in case of individual values
             if smoothing_left is not None:
                 key.SetTimeRight(
-                    curve, c4d.BaseTime(-smoothing_left * run_time))
+                    curve, c4d.BaseTime(smoothing_left * run_time))
             if smoothing_right is not None:
                 key.SetTimeLeft(
                     curve, c4d.BaseTime(-smoothing_right * run_time))
@@ -650,10 +662,8 @@ class Scene():
         def complete_animations(animation_group):
             # adds show or hide depending on animation category
             if animation_group.category == "neutral":
-                print(animation_group.category, animation_group)
                 return animation_group
             elif animation_group.category == "constructive":
-                print(animation_group.category, animation_group)
                 animation_group.category = "neutral"
                 cobjects = animation_group.cobjects
                 params = animation_group.params
@@ -661,15 +671,22 @@ class Scene():
                     (Show(*cobjects, **params), (0, 0.01)), (animation_group, (0, 1)))
                 return animation_group
             elif animation_group.category == "destructive":
-                print(animation_group.category, animation_group)
                 animation_group.category = "neutral"
                 cobjects = animation_group.cobjects
                 params = animation_group.params
                 animation_group = AnimationGroup(
                     (Hide(*cobjects, **params), (0.99, 1)), (animation_group, (0, 1)))
                 return animation_group
+            elif animation_group.category == "glimpse":
+                animation_group.category = "neutral"
+                cobjects = animation_group.cobjects
+                params = animation_group.params
+                animation_group = AnimationGroup(
+                    (Show(*cobjects, **params), (0, 0.01)), (Hide(*cobjects, **params), (0.99, 1)), (animation_group, (0, 1)))
+                return animation_group
 
         # function for recursive application
+
         def flatten_recursion(item_list, animations_list=[]):
             # discern between types
             for item in item_list:
@@ -837,5 +854,5 @@ class ThreeDScene(Scene):
         # define 3d camera
         self.camera = ThreeDCamera()
         self.camera_group = Group(
-            self.camera, group_name="Camera", h=PI / 16, p=-PI / 16, b=PI / 4)
+            self.camera, group_name="Camera", p=-PI / 8, b_frozen=PI / 4)
         super(ThreeDScene, self).__init__(**params)

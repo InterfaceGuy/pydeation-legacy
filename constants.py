@@ -19,9 +19,10 @@ def average(color1, color2):
 
     return average_color
 
+
 # meta data
 CONTENT_PATH = "/Users/davidrug/Documents/Ataraxia/OpenIdeation/YouTubeChannel/Content"
-PROJECTS_PATH = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R23_2FE1299C/library/scripts/PydeationProjects"
+PROJECTS_PATH = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R24_36E19156/library/scripts/PydeationProjects"
 
 # material related constants
 BLUE = c4d.Vector(0, 153, 204) / 255
@@ -37,4 +38,3 @@ FILLER_TRANSPARENCY = 0.93
 
 # math
 PI = 3.14159  # use np.pi once pip install is working
-

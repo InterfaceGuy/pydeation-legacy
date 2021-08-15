@@ -67,7 +67,7 @@ class Eye(CustomObject):
 
     custom_object_name = "Eye"
 
-    def __init__(self, color=BLUE, mirror=False, **params):
+    def __init__(self, color=WHITE, **params):
 
         opening_angle = PI / 4
         eyeball_radius = 230
@@ -77,10 +77,9 @@ class Eye(CustomObject):
         end_point = self.polar_to_cartesian(eyeball_radius, end_angle)
 
         # gather components
-        if mirror:
-            pupil = Dot(x=190, y=-2, scale_z=3, scale=2 / 3, color=BLACK)
-        else:
-            pupil = Dot(x=190, y=2, scale_z=3, scale=2 / 3, color=BLACK)
+        pupil = Group(Dot(x=190, y=2, scale_z=3, scale=2 / 3, color=BLACK),
+                      Dot(x=190, y=-2, scale_z=3, scale=2 / 3, color=BLACK),
+                      group_name="pupils")
 
         self.components = {
             "iris": Dot(x=180, scale_z=3, scale=2, color=color),
@@ -130,16 +129,21 @@ class Logo(CustomObject):
         angle_lines = PI / 3
         # anlge of the center of the lines
         angle_offset = - PI / 2
-        # the height of the focal point
-        focal_height = 100
-        # the point were the lines meet
-        focal_point = (0, 0, focal_height)
         # relative scale of small circle
-        small_circle_scale = 1 / 2
+        self.small_circle_radius = 200 * 0.61
+        # center point of small circle
+        self.small_circle_center_height = 200 - self.small_circle_radius - 6
+        # center point of small circle
+        small_circle_center_point = (0, 0, self.small_circle_center_height)
+        # the height of the focal point
+        self.focal_height = self.small_circle_center_height + \
+            0.11 * self.small_circle_radius
+        # the point were the lines meet
+        focal_point = (0, 0, self.focal_height)
 
         self.components = {
             "main_circle": Circle(color=BLUE),
-            "small_circle": Circle(z=focal_height, scale=small_circle_scale, color=YELLOW),
+            "small_circle": Circle(z=self.small_circle_center_height, radius=self.small_circle_radius, color=YELLOW),
             "lines": Group(Spline([self.polar_to_cartesian(200, angle_offset + angle_lines / 2), focal_point]), Spline([self.polar_to_cartesian(200, angle_offset - angle_lines / 2), focal_point]), group_name="Lines")
         }
         super(Logo, self).__init__(**params)
@@ -182,7 +186,7 @@ class Axes(CustomObject):
 
     custom_object_name = "Axes"
 
-    def __init__(self, mode="x", no_ticks=False, length_x=400, length_y=400, length_z=400, x_start=None, x_end=None, y_start=None, y_end=None, z_start=None, z_end=None, tick_length=10, x_tick_distance=30, y_tick_distance=30, z_tick_distance=30, arrow_start=False, arrow_end=True, thickness=5, **params):
+    def __init__(self, mode="xyz", no_ticks=False, length_x=400, length_y=400, length_z=400, x_start=None, x_end=None, y_start=None, y_end=None, z_start=None, z_end=None, tick_length=10, x_tick_distance=30, y_tick_distance=30, z_tick_distance=30, arrow_start=False, arrow_end=True, thickness=5, **params):
 
         # override custom start,end length if specified
         # x
