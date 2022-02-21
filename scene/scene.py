@@ -20,7 +20,11 @@ class Scene():
     The scene class will create a new document, apply the sketch&toon shader and control all the render settings
     """
 
-    def __init__(self, imported=False, quality="default"):
+    CONFIG = {}
+
+    def __init__(self, imported=False, quality="default", fps=30, square=False, render=False):
+        # update config
+        Scene.CONFIG.update(self.CONFIG)
 
         # scene-wide attributes
         self.time = 0
@@ -28,10 +32,14 @@ class Scene():
         self.chronos = []
 
         # setup scene but only insert it in c4d if not imported
-        self.setup(insert=(not imported), quality=quality)
+        self.setup(insert=(not imported), quality=quality, fps=fps, square=square)
         self.construct()
 
-    def setup(self, insert=True, quality="normal"):
+        if render is True:
+            self.save()
+            self.render()
+
+    def setup(self, insert=True, quality="default", fps=30, square=False):
         # handles everything related to document
         # document related actions
         self.doc = c4doc.BaseDocument()
@@ -42,6 +50,9 @@ class Scene():
         # insert document in menu list
         if insert:
             c4doc.InsertBaseDocument(self.doc)
+
+        # set fps
+        self.doc[c4d.DOCUMENT_FPS] = fps
         # timeline
         self.time_ini = None
         self.time_fin = None
@@ -56,6 +67,7 @@ class Scene():
         sketch_vp[c4d.OUTLINEMAT_SHADING_BACK_COL] = c4d.Vector(0, 0, 0)
         sketch_vp[c4d.OUTLINEMAT_SHADING_OBJECT] = False
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT] = True
+        sketch_vp[c4d.OUTLINEMAT_EDLINES_LINE_DRAW] = 1  # 3D lines in editor
         # set mode to custom
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_INDEPENDENT_MODE] = 1
         sketch_vp[c4d.OUTLINEMAT_PIXELUNITS_BASEW] = 1280  # set custom width
@@ -83,6 +95,10 @@ class Scene():
         elif quality == "veryhigh":
             self.render_data[c4d.RDATA_XRES] = 3840
             self.render_data[c4d.RDATA_YRES] = 2160
+        # toggle square mode
+        if square is True:
+            self.render_data[c4d.RDATA_FILMASPECT] = 1.0
+            c4d.EventAdd()
         # add camera
         self.add(self.camera)
         # set view to camera
@@ -107,6 +123,7 @@ class Scene():
         # create folder with scene's name
         try:  # check if folder already exists
             os.mkdir(self.scene_path)
+            print(self.scene_path)
             print("path successfully created")
         except FileNotFoundError:
             print("path not found")
@@ -120,6 +137,10 @@ class Scene():
         c4d.EventAdd()
 
     def render(self):
+        # read in metadata
+        self.project_name = PROJECT_NAME
+        self.category = CATEGORY
+        self.thinker = THINKER
         # this gives us the path of the project to store the individual renders in
         self.project_path = os.path.join(
             PROJECTS_PATH, self.category, self.thinker, self.project_name)
@@ -198,6 +219,13 @@ class Scene():
             cobject.obj.InsertTag(cobject.sketch_tag)
             # add cobject to kairos list
             self.kairos.append(cobject)
+
+            # add nulls in case of tracer
+            if hasattr(cobject, "nulls"):
+                for null in cobject.nulls:
+                    self.add_to_kairos_helper(null)
+                    null.obj.InsertUnder(cobject.obj)
+
             # update cinema
             c4d.EventAdd()
 
@@ -222,6 +250,17 @@ class Scene():
             spline_object.parent.InsertTag(spline_object.sketch_tag)
             # add spline object to kairos list
             self.kairos.append(spline_object)
+
+            # add nulls in case of tracer
+            if hasattr(spline_object, "nulls"):
+                for null in spline_object.nulls:
+                    self.add_to_kairos_helper(null)
+                    null.obj.InsertUnder(spline_object.obj)
+
+            # clean up svg
+            if hasattr(spline_object, "svg"):
+                c4doc.KillDocument(spline_object.svg_doc)  # kill svg document after import
+
             # update cinema
             c4d.EventAdd()
 
@@ -414,14 +453,17 @@ class Scene():
                         scale_x, scale_y, scale_z = matrix.GetScale(
                         ).x, matrix.GetScale().y, matrix.GetScale().z
                         # create pydeation letter
-                        pydeation_letter = Spline(letter, x=x, y=y, z=z, h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
-                                                  scale_z=scale_z, thickness=2, stroke_order="left_right")
-                        pydeation_letters.append(
-                            pydeation_letter)
+                        if "x" not in text.params:
+                            text.params["x"] = 0
+                        if "y" not in text.params:
+                            text.params["y"] = 0
+                        if "z" not in text.params:
+                            text.params["z"] = 0
+                        pydeation_letter = Spline(letter, x=x-text.params["x"], y=y, z=z-text.params["z"], h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
+                                                  scale_z=scale_z, thickness=TEXT_THICKNESS, stroke_order="left_right", clipping="inside")
+                        pydeation_letters.append(pydeation_letter)
                 # create text from letters
-                # correct for rotation bug
-                pydeation_text = CustomText(
-                    pydeation_letters, p=-PI / 2, **text.params)
+                pydeation_text = CustomText(pydeation_letters, p=-PI / 2, **text.params)  # correct for rotation bug
 
             else:
                 # unpack letters
@@ -442,10 +484,10 @@ class Scene():
                     ).x, matrix.GetScale().y, matrix.GetScale().z
                     # create pydeation letter
                     pydeation_letter = Spline(letter, x=x, y=y, z=z, h=h, p=p, b=b, scale_x=scale_x, scale_y=scale_y,
-                                              scale_z=scale_z, thickness=2, stroke_order="left_right")
+                                              scale_z=scale_z, thickness=TEXT_THICKNESS, stroke_order="left_right", clipping="inside")
                     pydeation_letters.append(pydeation_letter)
                 # create text from letters
-                pydeation_text = CustomText(pydeation_letters, **text.params)
+                pydeation_text = CustomText(pydeation_letters)
 
             # add group
             self.add_to_kairos_custom_object(pydeation_text)
@@ -457,6 +499,149 @@ class Scene():
 
             return pydeation_text
 
+    def add_to_kairos_helper(self, cobject):
+        # handles kairos for cobjects
+
+        # check if already in kairos
+        if (cobject in self.kairos):
+            pass
+        else:
+            # add helper object to kairos
+            self.doc.InsertObject(cobject.obj)
+            # add helper object to kairos list
+            self.kairos.append(cobject)
+            # update cinema
+            c4d.EventAdd()
+
+    def add_to_kairos_morpher(self, morpher):
+        # handles kairos for groups
+
+        # add morpher as spline object
+        self.add_to_kairos_spline_object(morpher)
+        # add children to kairos
+        
+        splines = morpher.children
+        start_spline = splines[1]
+        destination_spline = splines[0]
+
+
+        # make splines editable
+
+        splines_editable = []
+        
+        for spline in splines:
+
+            spline_editable = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_MAKEEDITABLE, list=[
+                spline.obj], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+            
+            splines_editable.append(spline_editable[0])
+
+
+        start_spline_editable = splines_editable[1]
+        destination_spline_editable = splines_editable[0]
+        
+        # get segment count of start_spline
+        seg_cnt_start = start_spline_editable.GetSegmentCount()
+        seg_cnt_destination = destination_spline_editable.GetSegmentCount()
+
+        
+        # calculate copying parameters
+        if seg_cnt_start > seg_cnt_destination:
+
+            num_full_copies, num_partial_copies = divmod(seg_cnt_start, seg_cnt_destination)
+
+            # clone destination spline
+            destination_spline_clones = c4d.BaseObject(c4d.Onull)
+            
+            for i in range(num_full_copies):
+                
+                # create clone
+                destination_spline_clone = destination_spline_editable.GetClone()
+                # insert clone under null
+                self.doc.InsertObject(destination_spline_clone)
+                destination_spline_clone.InsertUnder(destination_spline_clones)
+
+            # partial copies
+            first_clone = destination_spline_editable
+            # explode segments
+            res = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_EXPLODESEGMENTS, list=[
+                first_clone], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+
+            # delete remaining segments
+            segments = first_clone.GetChildren()
+            for i, segment in enumerate(segments):
+                if i < num_partial_copies:
+                    segment.InsertUnder(destination_spline_clones)
+                else:
+                    segment.Remove()
+
+            # merge clones into single object
+            destination_spline_merged = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_JOIN, list=[
+                destination_spline_clones], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+
+            # insert splines
+            self.doc.InsertObject(destination_spline_merged[0])
+            destination_spline_merged[0].InsertUnder(morpher.obj)
+            
+
+            for spline_editable in splines_editable[1:][::-1]:
+                self.doc.InsertObject(spline_editable)
+                spline_editable.InsertUnder(morpher.obj)
+
+        elif seg_cnt_start < seg_cnt_destination:
+
+            num_full_copies, num_partial_copies = divmod(seg_cnt_destination, seg_cnt_start)
+
+            # clone destination spline
+            start_spline_clones = c4d.BaseObject(c4d.Onull)
+   
+            # full copies
+            for i in range(num_full_copies):
+                # create clone
+                start_spline_clone = start_spline_editable.GetClone()
+                # insert clone under null
+                self.doc.InsertObject(start_spline_clone)
+                start_spline_clone.InsertUnder(start_spline_clones)
+
+            # partial copies
+            first_clone = start_spline_editable
+            # explode segments
+            res = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_EXPLODESEGMENTS, list=[
+                first_clone], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+
+            # delete remaining segments
+            segments = first_clone.GetChildren()
+            for i, segment in enumerate(segments):
+                if i < num_partial_copies:
+                    segment.InsertUnder(start_spline_clones)
+                else:
+                    segment.Remove()
+
+            # merge clones into single object
+            start_spline_merged = c4d.utils.SendModelingCommand(command=c4d.MCOMMAND_JOIN, list=[
+                start_spline_clones], mode=c4d.MODELINGCOMMANDMODE_ALL, doc=self.doc)
+
+            
+            # insert splines
+            for spline_editable in splines_editable[:-1][::-1]:
+                self.doc.InsertObject(spline_editable)
+                spline_editable.InsertUnder(morpher.obj)
+            self.doc.InsertObject(start_spline_merged[0])
+            start_spline_merged[0].InsertUnder(morpher.obj)
+
+        else:
+
+            # insert splines
+            for spline_editable in splines_editable:
+                self.doc.InsertObject(spline_editable)
+                spline_editable.InsertUnder(morpher.obj)
+
+        # add splines to kairos list
+        self.kairos.append(start_spline)
+        self.kairos.append(destination_spline)
+        # update cinema
+        c4d.EventAdd()
+
     def add(self, *cobjects):
         # checks whether object is in kairos and if not adds it
         for cobject in cobjects:
@@ -467,6 +652,9 @@ class Scene():
                 # check for group
                 if cobject.ctype == "Group":
                     self.add_to_kairos_group(cobject)
+                # check for morpher
+                elif cobject.ctype == "Morpher":
+                    self.add_to_kairos_morpher(cobject)
                 # check for custom object
                 elif cobject.ctype == "CustomObject":
                     self.add_to_kairos_custom_object(cobject)
@@ -485,6 +673,7 @@ class Scene():
                     elif cobject.ctype == "SplineObject":
                         # add spline object to kairos
                         self.add_to_kairos_spline_object(cobject)
+                    # motext object
                     elif cobject.ctype == "MoText":
                         # add motext to kairos and return spline object
                         spline_text = self.add_to_kairos_motext(cobject)
@@ -493,6 +682,10 @@ class Scene():
                     elif cobject.ctype == "Camera":
                         # add camera object to kairos
                         self.add_to_kairos_camera(cobject)
+                    # check for effector
+                    elif cobject.ctype in ("Effector", "MoSpline"):
+                        self.add_to_kairos_helper(cobject)
+
 
     def get_frame(self):
         # returns the frame corresponding to the current time
@@ -697,6 +890,9 @@ class Scene():
                 # animation group
                 elif isinstance(item, AnimationGroup):
                     animation_group = item
+                    # add helper objects from animation group
+                    if animation_group.helper_objects is not None:
+                        self.add(*animation_group.helper_objects)
                     # complete animations depending on category
                     animation_group = complete_animations(animation_group)
                     # unpack animations and append
@@ -729,9 +925,8 @@ class Scene():
         elif animation_type == "spline_tag_type":
             target = cobject.align_to_spline_tag
         elif animation_type == "visibility_type":
-            if cobject.ctype == "SplineObject":
+            if cobject.ctype in ("SplineObject", "Morpher"):
                 target = cobject.parent
-
             else:
                 target = cobject.obj
         else:
@@ -769,15 +964,10 @@ class Scene():
     def play(self, *animations, run_time=1, in_frames=False):
         # plays animations of cobjects
 
-        # complete animations
-        # self.complete_animations(*animations)
-
         # set initial keyframes
         # unpack animation groups inside tuple
         animations = self.flatten_animations(animations)
 
-        # get cobjects from flattened animations
-        cobjects = self.get_cobjects(animations)
         # unpack individual animations
         for animation in animations:
             # unpack data from animations
@@ -832,7 +1022,8 @@ class Scene():
     def set(self, *transformations):
         # sets object to end state of animation without playing it
 
-        self.play(*transformations, run_time=1, in_frames=True)
+        fps = self.doc.GetFps()
+        self.play(*transformations, run_time=1/fps)
 
     def zoom(self, zoom, run_time=1, smoothing=0.25):
         # animates zoom of currently active camera
@@ -843,16 +1034,56 @@ class Scene():
 
 class TwoDScene(Scene):
 
+    CONFIG = {
+        "camera_position": (0,0),
+        "camera_zoom": 1
+    }
+
     def __init__(self, **params):
+        # update config
+        TwoDScene.CONFIG.update(self.CONFIG)
+
         # define 2d camera
-        self.camera = TwoDCamera()
+        # set position
+        x, z = TwoDScene.CONFIG["camera_position"]
+        # set zoom
+        zoom = TwoDScene.CONFIG["camera_zoom"]
+        self.camera = TwoDCamera(x=x, z=z, zoom=zoom)
         super(TwoDScene, self).__init__(**params)
 
 class ThreeDScene(Scene):
 
+    CONFIG = {
+        "camera_perspective": "default",
+        "camera_position": (0,0),
+        "camera_zoom": 1
+    }
+
     def __init__(self, **params):
+        # update config
+        ThreeDScene.CONFIG.update(self.CONFIG)
+
+        # read out perspective
+        if ThreeDScene.CONFIG["camera_perspective"] == "default":
+            p = -PI/8
+            b_frozen = PI/4
+        elif ThreeDScene.CONFIG["camera_perspective"] == "front":
+            p = 0
+            b_frozen = 0
+
+        # read out position
+        x_pos = ThreeDScene.CONFIG["camera_position"][0]
+        z_pos = ThreeDScene.CONFIG["camera_position"][1]
+
+        # read out zoom
+        zoom = ThreeDScene.CONFIG["camera_zoom"]
+
         # define 3d camera
-        self.camera = ThreeDCamera()
+        self.camera = ThreeDCamera(zoom=zoom, x=x_pos, z=z_pos)
         self.camera_group = Group(
-            self.camera, group_name="Camera", p=-PI / 8, b_frozen=PI / 4)
+            self.camera, group_name="Camera", 
+            p=p,
+            b_frozen=b_frozen,
+            z_frozen=z_pos)
+
         super(ThreeDScene, self).__init__(**params)

@@ -6,6 +6,7 @@ from c4d.utils import SinCos
 c4d.Msketch = 1011014  # add missing descriptor for sketch material
 c4d.Tsketch = 1011012  # add missing descriptor for sketch tag
 c4d.MoText = 1019268  # add missing descriptor for MoText
+c4d.NGon = 5179  # add missing descriptor for NGon
 
 # TO DO: find proper solution for sketch material!
 
@@ -23,6 +24,12 @@ class CObject():
         "pos_y": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
                             c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
         "pos_z": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
+        "pos_x_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_X, c4d.DTYPE_REAL, 0)),
+        "pos_y_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_POSITION, c4d.DTYPE_VECTOR, 0),
+                            c4d.DescLevel(c4d.VECTOR_Y, c4d.DTYPE_REAL, 0)),
+        "pos_z_frozen": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_FROZEN_POSITION, c4d.DTYPE_VECTOR, 0),
                             c4d.DescLevel(c4d.VECTOR_Z, c4d.DTYPE_REAL, 0)),
         "rot": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0)),
         "rot_h": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_ROTATION, c4d.DTYPE_VECTOR, 0),
@@ -63,15 +70,16 @@ class CObject():
                                      c4d.DescLevel(c4d.COLOR_G, c4d.DTYPE_REAL, 0)),
         "sketch_color_b": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_COLOR, c4d.DTYPE_COLOR, 0),
                                      c4d.DescLevel(c4d.COLOR_B, c4d.DTYPE_REAL, 0)),
+        "sketch_thickness": c4d.DescID(c4d.DescLevel(c4d.OUTLINEMAT_THICKNESS, c4d.DTYPE_REAL, 0)),
 
         # filler material
         "filler_transparency": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS, c4d.DTYPE_REAL, 0)),
         "filler_color": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0)),
-        "filler_color_r": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+        "filler_color_r": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_LUMINANCE_COLOR, c4d.DTYPE_COLOR, 0),
                                      c4d.DescLevel(c4d.COLOR_R, c4d.DTYPE_REAL, 0)),
-        "filler_color_g": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+        "filler_color_g": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_LUMINANCE_COLOR, c4d.DTYPE_COLOR, 0),
                                      c4d.DescLevel(c4d.COLOR_G, c4d.DTYPE_REAL, 0)),
-        "filler_color_b": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_COLOR_COLOR, c4d.DTYPE_COLOR, 0),
+        "filler_color_b": c4d.DescID(c4d.DescLevel(c4d.MATERIAL_LUMINANCE_COLOR, c4d.DTYPE_COLOR, 0),
                                      c4d.DescLevel(c4d.COLOR_B, c4d.DTYPE_REAL, 0)),
 
         # visibility
@@ -79,7 +87,7 @@ class CObject():
         "vis_render": c4d.DescID(c4d.DescLevel(c4d.ID_BASEOBJECT_VISIBILITY_RENDER, c4d.DTYPE_LONG, 0))
         }
 
-    def __init__(self, show=False, x=0, y=0, z=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, isoparms=False, arrow_start=False, arrow_end=False, thickness=8, line_style="solid", stroke_order="long_short", intersection=False, intersects_with=None, fill=None, contour=True): 
+    def __init__(self, show=False, x=0, y=0, z=0, x_frozen=0, y_frozen=0, z_frozen=0, scale=1, scale_x=None, scale_y=None, scale_z=None, h=0, p=0, b=0, h_frozen=0, p_frozen=0, b_frozen=0, transparency=1, solid=False, completion=0, color=WHITE, fill_color=None, isoparms=False, arrow_start=False, arrow_end=False, thickness=PRIM_THICKNESS, line_style="solid", stroke_order="bottom_top", intersects_with=None, fill=None, contour=True, stroke_offset_start=0, stroke_offset_end=1, clipping=None): 
 
         if not hasattr(self, "obj"):
             self.obj = c4d.BaseObject(c4d.Onull)  # return null as default
@@ -103,9 +111,19 @@ class CObject():
         self.align_to_spline_tag = None
 
         # set universal default params
+        if fill_color is None:
+            fill_color = color
+
+        # handle intersections
+        if intersects_with is None:
+            intersection = False
+        else:
+            intersection = True
+
         self.color = color
-        self.set_filler_mat(color=self.color, fill=fill)
-        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order, intersection=intersection, intersects_with=intersects_with, contour=contour)
+        self.fill_color = fill_color
+        self.set_filler_mat(color=self.fill_color, fill=fill)
+        self.set_sketch_mat(color=self.color, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, line_style=line_style, stroke_order=stroke_order, intersection=intersection, intersects_with=intersects_with, contour=contour, stroke_offset_start=stroke_offset_start, stroke_offset_end=stroke_offset_end, clipping=clipping)
         self.sketch_tag[c4d.OUTLINEMAT_LINE_SPLINES] = True
         self.sketch_tag[c4d.OUTLINEMAT_LINE_ISOPARMS] = isoparms
 
@@ -115,10 +133,10 @@ class CObject():
         self.set_visibility(show=show)
         # transform
         self.set_initial_params_object(self.transform(
-            x=x, y=y, z=z, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b, h_frozen=h_frozen, p_frozen=p_frozen, b_frozen=b_frozen, relative=False))
+            x=x, y=y, z=z, x_frozen=x_frozen, y_frozen=y_frozen, z_frozen=z_frozen, scale=scale, scale_x=scale_x, scale_y=scale_y, scale_z=scale_z, h=h, p=p, b=b, h_frozen=h_frozen, p_frozen=p_frozen, b_frozen=b_frozen, relative=False))
         # fill
         self.set_initial_params_filler_material(
-            self.fill(transparency=transparency, solid=solid))
+            self.fill_animate(transparency=transparency, solid=solid))
         # draw
         self.set_initial_params_sketch_material(
             self.sketch_animate(completion=completion))
@@ -155,7 +173,7 @@ class CObject():
         self.filler_mat[c4d.MATERIAL_TRANSPARENCY_REFRACTION] = 1
         self.filler_mat[c4d.MATERIAL_USE_REFLECTION] = False
 
-    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=5, line_style="solid", stroke_order="long_short", intersection=False, contour=True, intersects_with=None):
+    def set_sketch_mat(self, color=BLUE, arrow_end=False, arrow_start=False, thickness=PRIM_THICKNESS, line_style="solid", stroke_order="long_short", intersection=False, contour=True, intersects_with=None, stroke_offset_start=0, stroke_offset_end=1, clipping=None):
         # sets params of filler mat as a function of color
 
         self.sketch_mat[c4d.OUTLINEMAT_COLOR] = color
@@ -175,12 +193,11 @@ class CObject():
             self.sketch_tag[c4d.OUTLINEMAT_LINE_INTERESTION_OBJS_LIST] = intersection_objects
         self.sketch_tag[c4d.OUTLINEMAT_LINE_FOLD] = contour
         self.sketch_tag[c4d.OUTLINEMAT_LINE_CREASE] = contour
-        self.sketch_tag[c4d.OUTLINEMAT_LINE_BORDER] = contour
+        self.sketch_tag[c4d.OUTLINEMAT_LINE_BORDER] = True  # quick and dirty fix -> do properly in V2
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_AUTODRAW] = True
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_TYPE] = 2
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_SPEED_COMPLETE] = 0
         self.sketch_mat[c4d.OUTLINEMAT_FILTER_STROKES] = False
-        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKES] = 4
         self.sketch_mat[c4d.OUTLINEMAT_OPACITY] = 1.0
         self.sketch_mat[c4d.OUTLINEMAT_ADV_SELFBLENDMODE] = 1  # self-blend average to handle overlapping
         self.sketch_mat[c4d.OUTLINEMAT_CONNECTIIONZ] = 3  # set Match to World to only connect strokes that touch
@@ -210,6 +227,15 @@ class CObject():
         # stroke order
         order = {"long_short":0, "short_long":1, "top_bottom":2, "bottom_top":3, "left_right":4, "right_left":5, "random":6}
         self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKES] = order[stroke_order]
+        # stroke offset
+        self.sketch_mat[c4d.OUTLINEMAT_ADJUSTMENT_STROKE_RESIZE] = True
+        self.sketch_mat[c4d.OUTLINEMAT_ADJUSTMENT_STROKESTART] = stroke_offset_start
+        self.sketch_mat[c4d.OUTLINEMAT_ADJUSTMENT_STROKEEND] = stroke_offset_end
+        # clipping
+        clipping_mode = {None:0, "inside":1, "outside":2}
+        self.sketch_mat[c4d.OUTLINEMAT_LINE_RENDERCLIP] = clipping_mode[clipping]  # set clipping to inside geometry
+        self.sketch_mat[c4d.OUTLINEMAT_STOKECLIP_TOSCREEN] = False  # turn clip to screen off
+
 
     @staticmethod
     def filter_descIds(descIds, default_values, input_values):
@@ -265,12 +291,6 @@ class CObject():
     def animate(self, animation_name, animation_type, smoothing=0.25, smoothing_left=None, smoothing_right=None, rel_start_point=0, rel_end_point=1, **params):
         # abstract animation method that calls specific animations using animation_name
 
-        # check value for relative delay, cut off
-        #if rel_start_point < 0 or rel_start_point > 1:
-         #   raise ValueError("relative delay must be between 0-1!")
-        #if rel_end_point < 0 or rel_end_point > 1:
-         #   raise ValueError("relative cut off must be between 0-1!")
-
         values, descIds = getattr(self, animation_name)(**params)
         rel_run_time = (rel_start_point, rel_end_point)
         animation = Animation(self, descIds, values,
@@ -317,7 +337,7 @@ class CObject():
         for value, paramId in zip(values, paramIds):
             self.sketch_mat[paramId] = value
 
-    def transform(self, x=0.0, y=0.0, z=0.0, h=0.0, p=0.0, b=0.0, h_frozen=0.0, p_frozen=0.0, b_frozen=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True):
+    def transform(self, x=0.0, y=0.0, z=0.0, x_frozen=0, y_frozen=0, z_frozen=0, h=0.0, p=0.0, b=0.0, h_frozen=0.0, p_frozen=0.0, b_frozen=0.0, scale=1.0, scale_x=None, scale_y=None, scale_z=None, relative=True):
         # transforms the objects position, rotation, scale
 
         # gather descIds
@@ -325,6 +345,9 @@ class CObject():
             CObject.descIds["pos_x"],
             CObject.descIds["pos_y"],
             CObject.descIds["pos_z"],
+            CObject.descIds["pos_x_frozen"],
+            CObject.descIds["pos_y_frozen"],
+            CObject.descIds["pos_z_frozen"],
             CObject.descIds["rot_h"],
             CObject.descIds["rot_p"],
             CObject.descIds["rot_b"],
@@ -350,18 +373,18 @@ class CObject():
             s_z = scale_z * scale
         if relative:
             # get relative values
-            rel_values = [x, y, z, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
+            rel_values = [x, y, z, x_frozen, y_frozen, z_frozen, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
             # calculate additive absolute values
             abs_values_additive = [curr_value + rel_value for curr_value,
-                                   rel_value in zip(curr_values[:9], rel_values[:9])]
+                                   rel_value in zip(curr_values[:12], rel_values[:12])]
             # calculate multiplicative absolute values
             abs_values_multiplicative = [
-                curr_value * rel_value for curr_value, rel_value in zip(curr_values[9:], rel_values[9:])]
+                curr_value * rel_value for curr_value, rel_value in zip(curr_values[12:], rel_values[12:])]
             # concatenate to absolute values
             input_values = abs_values_additive + abs_values_multiplicative
-            default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+            default_values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
         else:
-            input_values = [x, y, z, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
+            input_values = [x, y, z, x_frozen, y_frozen, z_frozen, h, p, b, h_frozen, p_frozen, b_frozen, s_x, s_y, s_z]
             default_values = curr_values
 
         # filter out unchanged variables
@@ -397,7 +420,7 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def sketch_animate(self, sketch_mode="draw", stroke_order="left_right", stroke_method="single", sketch_speed="completion", color=None, completion=None, absolute_opacity=None, draw_speed=None, erase=False, erase_amount=None):
+    def sketch_animate(self, sketch_mode="draw", stroke_order=None, stroke_method="single", sketch_speed="completion", color=None, completion=None, absolute_opacity=None, draw_speed=None, erase=True, erase_amount=None, thickness=None):
         # draw contours
 
         # dicts for options
@@ -420,7 +443,8 @@ class CObject():
             CObject.descIds["sketch_stroke_start"],
             CObject.descIds["sketch_color_r"],
             CObject.descIds["sketch_color_g"],
-            CObject.descIds["sketch_color_b"]
+            CObject.descIds["sketch_color_b"],
+            CObject.descIds["sketch_thickness"]
         ]
 
         # create placeholder value for start_time, gets overwritten in play
@@ -437,7 +461,7 @@ class CObject():
             color_b = color.z
 
         # determine default and input values
-        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time, erase, erase_amount, color_r, color_g, color_b]
+        input_values = [mode[sketch_mode], order[stroke_order], method[stroke_method], speed[sketch_speed], completion, absolute_opacity, draw_speed, start_time, erase, erase_amount, color_r, color_g, color_b, thickness]
         default_values = self.get_current_values(descIds, mode="sketch")
 
         # filter out unchanged variables
@@ -446,7 +470,7 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def fill(self, transparency=FILLER_TRANSPARENCY, solid=False):
+    def fill_animate(self, transparency=FILLER_TRANSPARENCY, color=None, solid=False):
         # shifts transparency of filler material
 
         # check solid param
@@ -454,10 +478,22 @@ class CObject():
             transparency = 0
 
         # gather descIds
-        descIds = [CObject.descIds["filler_transparency"]]
+        descIds = [
+            CObject.descIds["filler_transparency"],
+            CObject.descIds["filler_color_r"],
+            CObject.descIds["filler_color_g"],
+            CObject.descIds["filler_color_b"]
+        ]
+
+        if color is None:
+            color_r = color_g = color_b = None
+        else:
+            color_r = color.x
+            color_g = color.y
+            color_b = color.z
 
         # determine default and input values
-        input_values = [transparency]
+        input_values = [transparency, color_r, color_g, color_b]
         default_values = self.get_current_values(descIds, mode="fill")
 
         # filter out unchanged variables
@@ -466,24 +502,6 @@ class CObject():
 
         return (values_filtered, descIds_filtered)
 
-    def fade(self, opacity=1.0):
-        # shifts opacity of sketch material
-
-        # set sketch animation mode to opacity
-        self.sketch_mat[c4d.OUTLINEMAT_ANIMATE_STROKE_MODE] = 2
-
-        # gather descIds
-        descIds = [CObject.descIds["sketch_completion"]]
-
-        # determine default and input values
-        input_values = [opacity]
-        default_values = self.get_current_values(descIds, mode="sketch")
-
-        # filter out unchanged variables
-        descIds_filtered, values_filtered = self.filter_descIds(
-            descIds, default_values, input_values)
-
-        return (values_filtered, descIds_filtered)
 
     def spline_tag(self, spline=None, t_ini=None, t_fin=None, enable=True, tangential=True):
         # enables the spline tag
@@ -523,11 +541,8 @@ class CObject():
 
 class SplineObject(CObject):
 
-    try:
-        ctype
-    except: 
-        # metadata
-        ctype = "SplineObject"
+    # metadata
+    ctype = "SplineObject"
 
     planes = {
         "XY": 0,
@@ -541,6 +556,7 @@ class SplineObject(CObject):
     }
 
     def __init__(self, **params):
+
         # set orientation to XZ plane
         self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
         # create parent loft for filler material
@@ -548,11 +564,11 @@ class SplineObject(CObject):
         # name loft after spline child
         self.parent.SetName(self.obj.GetName())
         # execute CObject init
-        super(SplineObject, self).__init__(**params)
+        super(SplineObject, self).__init__(contour=False, **params)
 
     def set_visibility(self, show=False):
         # override function for splineobjects to work on loft
-        if self.ctype == "SplineObject":
+        if self.ctype in ("SplineObject", "Morpher"):
             if show:
                 self.parent[c4d.ID_BASEOBJECT_VISIBILITY_EDITOR] = c4d.MODE_ON
                 self.parent[c4d.ID_BASEOBJECT_VISIBILITY_RENDER] = c4d.MODE_ON
@@ -564,9 +580,9 @@ class SplineObject(CObject):
 
 class Spline(SplineObject):
 
-    def __init__(self, points, spline_type="linear", closed=False, **params):
+    def __init__(self, points, spline_type="linear", closed=False, thickness=SPLINE_THICKNESS, **params):
         
-        if type(points) is list:
+        if type(points) in (list, tuple):
             # convert into c4d vectors
             point_vectors = []
             for point in points:
@@ -601,13 +617,24 @@ class Spline(SplineObject):
                 # set spline to open
                 self.obj[c4d.SPLINEOBJECT_CLOSED] = False
                 # execute CObject init
-                super(SplineObject, self).__init__(**params)
+                super(SplineObject, self).__init__(thickness=thickness, **params)
         elif type(points) is c4d.SplineObject:
             spline_object = points
             # write to object
             self.obj = spline_object.GetClone()
             # execute SplineObject init
             super(Spline, self).__init__(**params)
+
+class Arrow(Spline):
+
+    def __init__(self, start_point, end_point, offset_start=0, offset_end=1, inverse=False, arrow_start=False, arrow_end=True, thickness=5, **params):
+
+        if inverse:
+            points = [end_point, start_point]
+        else:
+            points = [start_point, end_point]
+
+        super(Arrow, self).__init__(points, arrow_start=arrow_start, arrow_end=arrow_end, thickness=thickness, stroke_offset_start=offset_start, stroke_offset_end=offset_end, **params)        
 
 class Rectangle(SplineObject):
 
@@ -646,7 +673,7 @@ class Rectangle(SplineObject):
         if rounding < 0 or rounding > 1:
             raise ValueError("rounding value must be between 0-1!")
         # radius
-        radius = min(curr_width, curr_height) / 2 * rounding
+        radius = min(width, height) / 2 * rounding
         # plane
         plane_id = SplineObject.planes[plane]
 
@@ -741,43 +768,65 @@ class Dot(Circle):
         # run Circle init with manipulated params
         super(Dot, self).__init__(**params)
 
-class Arc(CObject):
+class Arc(SplineObject):
 
-    def __init__(self, angle=PI / 2, plane="XZ", radius=200, **params):
+    def __init__(self, angle=PI / 2, symmetrical=False, plane="XZ", radius=200, mode="arc", **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinearc)
         # set ideosynchratic default params
 
         # set initial paramaters
         self.set_initial_params_object(self.change_params(
-            angle=angle, plane=plane, radius=radius))
+            angle=angle, plane=plane, radius=radius, symmetrical=symmetrical))
 
-        # set ctype
-        self.ctype = "CObject"
-        # run universal initialisation
-        super(Arc, self).__init__(**params)
+        # set params
+        modes = {"arc":0, "sector":1, "pie":2, "ring":3}
+        self.obj[c4d.PRIM_ARC_TYPE] = modes[mode]
+        self.obj[c4d.SPLINEOBJECT_INTERPOLATION] = 3  # set intermediate points to adaptive
 
-    def change_params(self, angle=PI / 4, plane="XZ", radius=200):
+
+        if mode == "arc":
+            # set ctype
+            self.ctype = "CObject"
+            # run universal initialisation
+            super(SplineObject, self).__init__(clipping=None, **params)
+        else:
+            # set ctype
+            self.ctype = "SplineObject"
+            # run universal initialisation
+            super(Arc, self).__init__(clipping=None, **params)
+
+
+    def change_params(self, angle=PI / 4, plane="XZ", radius=200, symmetrical=False):
 
         # gather descIds
+        desc_start_angle = c4d.DescID(c4d.DescLevel(
+            c4d.PRIM_ARC_START, c4d.DTYPE_REAL, 0))
         desc_end_angle = c4d.DescID(c4d.DescLevel(
             c4d.PRIM_ARC_END, c4d.DTYPE_REAL, 0))
         desc_plane = SplineObject.descIds["plane"]
         desc_radius = c4d.DescID(c4d.DescLevel(
             c4d.PRIM_ARC_RADIUS, c4d.DTYPE_REAL, 0))
 
-        descIds = [desc_end_angle, desc_plane, desc_radius]
+        descIds = [desc_start_angle, desc_end_angle, desc_plane, desc_radius]
 
         # determine default and input values
         # read out current values
         curr_values = self.get_current_values(descIds)
-        curr_end_angle, curr_plane_id, curr_radius = curr_values
+        curr_start_angle, curr_end_angle, curr_plane_id, curr_radius = curr_values
 
         # convert parameters
         # plane
         plane_id = SplineObject.planes[plane]
+        # angles
+        if symmetrical:
+            start_angle = -angle/2
+            end_angle = angle/2
+        else:
+            start_angle = None
+            end_angle = angle
 
-        input_values = [angle, plane_id, radius]
+        input_values = [start_angle, end_angle, plane_id, radius]
         default_values = curr_values
 
         # filter out unchanged values
@@ -824,7 +873,7 @@ class Cylinder(CObject):
 
 class Text(SplineObject):
 
-    def __init__(self, text, spline_only=False, stroke_order="left_right", thickness=2, height=50, **params):
+    def __init__(self, text, spline_only=False, stroke_order="left_right", thickness=TEXT_THICKNESS, height=50, **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Osplinetext)
 
@@ -845,10 +894,10 @@ class Text(SplineObject):
             # set plane
             self.obj[c4d.PRIM_PLANE] = SplineObject.planes["XZ"]
             # run universal initialisation
-            super(SplineObject, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+            super(SplineObject, self).__init__(clipping="inside", stroke_order=stroke_order, thickness=thickness, **params)
         else:
             # run universal initialisation
-            super(Text, self).__init__(stroke_order=stroke_order, thickness=thickness, **params)
+            super(Text, self).__init__(clipping="inside", stroke_order=stroke_order, thickness=thickness, **params)
 
 class MoText(CObject):
 
@@ -888,11 +937,49 @@ class Formula(SplineObject):
 
 class Plane(CObject):
 
-    def __init__(self, **params):
+    def __init__(self, landscape=True, heights=[], **params):
         # create object
         self.obj = c4d.BaseObject(c4d.Oplane)
+
+        ## set points
+        #for point in points:
+        #   # unpack point
+        #   index, height = point
+        #   # get current position
+        #   position = self.obj.GetPoint(index)
+        #   # set new position
+        #   self.obj.SetPoint(index, c4d.Vector(
+        #       position.x, position.y, height))
+
 
         # set ideosynchratic default params
 
         # run universal initialisation
         super(Plane, self).__init__(**params)
+
+class NGon(SplineObject):
+
+    def __init__(self, n=3, radius=200, rounding=False, rounding_radius=None, **params):
+        # create object
+        self.obj = c4d.BaseObject(c4d.NGon)
+
+        # set params
+        self.obj[c4d.PRIM_NSIDE_SIDES] = n
+        self.obj[c4d.PRIM_NSIDE_RADIUS] = radius
+        self.obj[c4d.PRIM_NSIDE_ROUNDING] = rounding
+        if rounding_radius is not None:
+            self.obj[c4d.PRIM_NSIDE_RRADIUS] = rounding_radius
+
+        # run universal initialisation
+        super(NGon, self).__init__(**params)
+
+
+class Picture(Rectangle):
+
+    def __init__(self, image=None, **params):
+
+        # set file path
+        self.image = image
+
+        # run universal initialisation
+        super(Picture, self).__init__(**params)

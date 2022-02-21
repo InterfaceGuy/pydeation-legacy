@@ -1,3 +1,3 @@
 THINKER = "InterfaceGuy"
 CATEGORY = "diverse"
-PROJECT_NAME = "Intro"
+PROJECT_NAME = "fourier_transform"

@@ -8,6 +8,9 @@ from pydeationlib.constants import *
 from pydeationlib.project import *
 from pydeationlib.object.object import *
 from pydeationlib.object.custom_objects import *
+from pydeationlib.object.vector_graphics import *
+from pydeationlib.object.mograph import *
 from pydeationlib.camera.camera import *
 from pydeationlib.animation.animator import *
 from c4d.utils import *
+import c4d

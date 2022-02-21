@@ -1,5 +1,6 @@
 from pydeationlib.animation.animation import *
 from pydeationlib.constants import *
+from pydeationlib.object.mograph import *
 import c4d
 from c4d.utils import SinCos, Smoothstep
 import numpy as np
@@ -57,10 +58,9 @@ class Animator():
         return flattened_cobjects
 
 
-class Domino():
-    # turns group animations into domino animations
+class Domino():    # turns group animations into domino animations
 
-    def __new__(cls, group, animator, rel_duration="dynamic", rel_overlap=0.5, global_smoothing=0, **params):
+    def __new__(cls, animator, group, rel_duration="dynamic", rel_overlap=0.5, global_smoothing=0.5, **params):
 
         number_children = len(group.children)
 
@@ -115,7 +115,7 @@ class Write():
             # unpack text
             text = custom_text.components["text"]
             # create domino animation
-            animation = Domino(text, DrawThenFillCompletely, rel_overlap=0.7, global_smoothing=global_smoothing, smoothing=0)
+            animation = Domino(DrawThenFillCompletely, text, rel_overlap=0.7, global_smoothing=global_smoothing, smoothing=0)
             animation_rescaled = AnimationGroup((animation, (rel_start_point, rel_end_point)))
             # pass params for later completion in play method
             animation_rescaled.params = params
@@ -137,7 +137,7 @@ class UnWrite():
             # unpack text
             text = custom_text.components["text"]
             # create domino animation
-            animation = Domino(text, UnFillThenUnDraw, rel_overlap=0.7, global_smoothing=global_smoothing, smoothing=0)
+            animation = Domino(UnFillThenUnDraw, text, rel_overlap=0.7, global_smoothing=global_smoothing, smoothing=0)
             animation_rescaled = AnimationGroup((animation, (rel_start_point, rel_end_point)))
             # pass params for later completion in play method
             animation_rescaled.params = params
@@ -280,14 +280,89 @@ class UnDraw(Animator):
 
         return animations
 
-class ChangeColor(Animator):
+class ChangeSketchColor(Animator):
 
     def __new__(cls, *cobjects, color=None, **params):
 
-        change_color = Animator(
+        change_sketch_color = Animator(
             "sketch_animate", "sketch_type", *cobjects, color=color, **params)
 
-        return change_color
+        return change_sketch_color
+
+class ChangeFillColor(Animator):
+
+    def __new__(cls, *cobjects, color=None, **params):
+
+        change_fill_color = Animator(
+            "fill_animate", "fill_type", *cobjects, color=color, transparency=None, **params)
+
+        return change_fill_color
+
+class ChangeColor(Animator):
+
+    def __new__(cls, *cobjects, color=None, fill_color=None, **params):
+
+        color_changes = []
+
+        # execute respective creation animator for cobjects
+        for cobject in cobjects:
+            # check for group
+            if cobject.__class__.__name__ == "Group":
+                for child in cobject.children:
+                    if child.__class__.__name__ == "Eye":
+                        eye_color_change = ChangeColorEye(child, color=color, fill_color=fill_color, **params)
+                        color_changes.append(eye_color_change)
+                    else:
+                        if fill_color is None:
+                            fill_color = color
+
+                        change_fill_color = ChangeFillColor(cobject, color=fill_color, **params)
+                        change_sketch_color = ChangeSketchColor(cobject, color=color, **params)
+    
+                        change_color = AnimationGroup((change_fill_color, (0, 1)), (change_sketch_color, (0, 1)))
+                        
+                        color_changes.append(change_color)
+            else:
+                if cobject.__class__.__name__ == "Eye":
+                    eye_color_change = ChangeColorEye(cobject, color=color, fill_color=fill_color, **params)
+                    color_changes.append(eye_color_change)
+                else:
+                    if fill_color is None:
+                        fill_color = color
+
+                    change_fill_color = ChangeFillColor(cobject, color=fill_color, **params)
+                    change_sketch_color = ChangeSketchColor(cobject, color=color, **params)
+
+                    change_color = AnimationGroup((change_fill_color, (0, 1)), (change_sketch_color, (0, 1)))
+                    color_changes.append(change_color)
+
+        return color_changes
+
+class ChangeColorEye(Animator):
+
+    def __new__(cls, *eyes, color=None, fill_color=None, **params):
+
+        if fill_color is None:
+            fill_color = color
+
+        eye_change_colors = []
+
+        for eye in eyes:
+            # get components
+            iris = eye.components["iris"]
+            pupil = eye.components["pupil"]
+            eyelids = eye.components["eyelids"]
+            eyeball = eye.components["eyeball"]
+
+            # gather animations
+            eye_change_fill_color = ChangeFillColor(iris, eyeball, eyelids, color=fill_color, **params)
+            eye_change_sketch_color = ChangeSketchColor(iris, eyeball, eyelids, color=color, **params)
+
+            eye_change_color = AnimationGroup((eye_change_fill_color, (0, 1)), (eye_change_sketch_color, (0, 1)))
+
+            eye_change_colors.append(eye_change_color)
+
+        return eye_change_colors
 
 class Fill(Animator):
 
@@ -296,7 +371,7 @@ class Fill(Animator):
     def __new__(cls, *cobjects, solid=False, transparency=FILLER_TRANSPARENCY, **params):
 
         fill_animations = Animator(
-            "fill", "fill_type", *cobjects, solid=solid, transparency=transparency, **params)
+            "fill_animate", "fill_type", *cobjects, solid=solid, transparency=transparency, **params)
         animations = AnimationGroup((fill_animations, (0, 1)))
 
         # pass params for later completion in play method
@@ -311,7 +386,7 @@ class UnFill(Animator):
 
     def __new__(cls, *cobjects, **params):
 
-        unfill_animations = Animator("fill", "fill_type",
+        unfill_animations = Animator("fill_animate", "fill_type",
                                      transparency=1, *cobjects, **params)
         animations = AnimationGroup((unfill_animations, (0, 1)))
 
@@ -363,6 +438,46 @@ class FadeOut(Animator):
 
         return animations
 
+class ChangeThickness(Animator):
+
+    def __new__(cls, *cobjects, thickness=5, **params):
+
+        change_thickness = Animator("sketch_animate", "sketch_type", *cobjects, thickness=thickness, **params)
+
+        return change_thickness
+
+class ThinOut(Animator):
+
+    category = "destructive"
+
+    def __new__(cls, *cobjects, **params):
+
+        thin_out = ChangeThickness(*cobjects, thickness=0, **params)
+
+        animations = AnimationGroup((thin_out, (0, 1)))
+
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
+
+        return animations
+
+class ThickIn(Animator):
+
+    category = "constructive"
+
+    def __new__(cls, *cobjects, thickness=PRIM_THICKNESS, **params):
+
+        thick_in = ChangeThickness(*cobjects, thickness=thickness, **params)
+
+        animations = AnimationGroup((thick_in, (0, 1)))
+
+        # pass params for later completion in play method
+        animations.params = params
+        animations.category = cls.category
+
+        return animations
+
 class DrawThenFill(Draw, Fill):
 
     category = "constructive"
@@ -386,11 +501,11 @@ class DrawThenFillCompletely(Draw, Fill):
 
     def __new__(cls, *cobjects, **params):
 
-        draw_animations = Draw(*cobjects, **params)
-        fill_animations = Fill(
+        draw = Draw(*cobjects, **params)
+        fill = Fill(
             solid=True, *cobjects, **params)
 
-        animations = AnimationGroup((draw_animations, (0, 0.6)), (fill_animations, (0.3, 1)))
+        animations = AnimationGroup((draw, (0, 0.6)), (fill, (0.5, 1)))
 
         # pass params for later completion in play method
         animations.params = params
@@ -406,10 +521,9 @@ class UnDrawThenUnFill(UnDraw, UnFill, Hide):
 
         undraw_animations = UnDraw(*cobjects, **params)
         unfill_animations = UnFill(*cobjects, **params)
-        hide_animations = Hide(*cobjects, **params)
 
         animations = AnimationGroup(
-            (undraw_animations, (0, 0.6)), (unfill_animations, (0.3, 0.99)), (hide_animations, (0.99, 1)))
+            (undraw_animations, (0, 0.6)), (unfill_animations, (0.3, 1)))
 
         # pass params for later completion in play method
         animations.params = params
@@ -423,10 +537,10 @@ class UnFillThenUnDraw(UnDraw, UnFill):
 
     def __new__(cls, *cobjects, **params):
 
-        unfill_animations = UnFill(*cobjects, **params)
-        undraw_animations = UnDraw(*cobjects, **params)
+        unfill = UnFill(*cobjects, **params)
+        undraw = UnDraw(*cobjects, **params)
 
-        animations = AnimationGroup((unfill_animations, (0, 0.6)), (undraw_animations, (0.3, 1)))
+        animations = AnimationGroup((unfill, (0, 0.6)), (undraw, (0.5, 1)))
 
         # pass params for later completion in play method
         animations.params = params
@@ -464,6 +578,132 @@ class ChangeParams(Animator):
 
         return animations
 
+class Morph(Animator):
+
+    def __new__(cls, start_spline, destination_spline, copy=False, **params):
+
+        # read params from start splines
+        fill_color_start = start_spline.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR]
+        sketch_color_start = start_spline.sketch_mat[c4d.OUTLINEMAT_COLOR]
+        fill_transparency_start = start_spline.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS]
+        sketch_opacity_start = start_spline.sketch_mat[c4d.OUTLINEMAT_OPACITY]
+        
+        # read params from destination splines
+        fill_color_destination = destination_spline.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR]
+        sketch_color_destination = destination_spline.sketch_mat[c4d.OUTLINEMAT_COLOR]
+        fill_transparency_destination = destination_spline.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS]
+        sketch_opacity_destination = destination_spline.sketch_mat[c4d.OUTLINEMAT_OPACITY]
+
+
+        # add mosplines
+        # create high-res splines from merged splines using mosplines
+        mospline1 = MoSpline(start_spline)
+        mospline2 = MoSpline(destination_spline)
+        # add plain effector
+        plain_effector = PlainEffector()
+        # add morpher
+        # add start_spline, destination_spline under morpher
+        morpher = Cloner(mospline2, mospline1, effectors=[plain_effector], morph_mode=True, completion=1, color=sketch_color_start, fill_color=fill_color_start, transparency=fill_transparency_start, show=False)
+
+        # set params for destination splines
+        if fill_transparency_destination == 0:
+            destination_spline.set_initial_params_filler_material(destination_spline.fill_animate(solid=True))
+
+        # set destination splines to completely drawn
+        destination_spline.set_initial_params_sketch_material(destination_spline.sketch_animate(completion=1))
+
+        # animation
+        hide_start_splines = Hide(start_spline, **params)
+        show_morpher = Show(morpher, **params)
+        morpher_to_background = Transform(morpher, y=-2)
+        morph_completion = ChangeParams(plain_effector, modify_clone=1)
+        blend_color = ChangeColor(morpher, color=sketch_color_destination, fill_color=fill_color_destination, **params)
+        blend_fill = Fill(morpher, transparency=fill_transparency_destination, **params)
+        show_destination_splines = Show(destination_spline, **params)
+        hide_morpher = Hide(morpher, **params)
+
+        if copy:
+            morph_animation_group = AnimationGroup((show_morpher, (0, 0.01)), (morpher_to_background, (0, 0.01)), (morph_completion, (0, 1)), (blend_color, (0, 1)), (blend_fill, (0, 1)), (show_destination_splines, (0.99, 1)), (hide_morpher, (0.99, 1)))
+        else:
+            morph_animation_group = AnimationGroup((hide_start_splines, (0, 0.01)), (show_morpher, (0, 0.01)), (morph_completion, (0, 1)), (blend_color, (0, 1)), (blend_fill, (0, 1)), (show_destination_splines, (0.99, 1)), (hide_morpher, (0.99, 1)))
+        
+        morph_animation_group.helper_objects = [mospline1, mospline2, plain_effector, morpher]
+
+        return morph_animation_group
+
+
+class Animorph(Animator):
+
+    def __new__(cls, *frames, copy=False, **params):
+
+
+        properties = []
+        mosplines = []
+
+        for frame in frames:
+            
+            # read params from frame
+            frame_properties = {
+                "fill_color": frame.filler_mat[c4d.MATERIAL_LUMINANCE_COLOR],
+                "sketch_color": frame.sketch_mat[c4d.OUTLINEMAT_COLOR],
+                "fill_transparency": frame.filler_mat[c4d.MATERIAL_TRANSPARENCY_BRIGHTNESS],
+                "sketch_opacity": frame.sketch_mat[c4d.OUTLINEMAT_OPACITY]
+                }
+            properties.append(frame_properties)
+
+            # add mosplines
+            mospline = MoSpline(frame)
+            mosplines.append(mospline)
+
+        # define start and end frames
+        start_spline = frames[0]
+        start_properties = properties[0]
+        destination_spline = frames[-1]
+        destination_properties = properties[-1]
+
+        sketch_color_start = start_properties["sketch_color"]
+        fill_color_start = start_properties["fill_color"]
+        fill_transparency_start = start_properties["fill_transparency"]
+
+        sketch_color_destination = destination_properties["sketch_color"]
+        fill_color_destination = destination_properties["fill_color"]
+        fill_transparency_destination = destination_properties["fill_transparency"]
+
+        # add plain effector
+        plain_effector = PlainEffector()
+        # add morpher
+
+        morpher = Cloner(*mosplines[::-1], effectors=[plain_effector], morph_mode=True, completion=1, color=sketch_color_start, fill_color=fill_color_start, transparency=fill_transparency_start, show=False)
+
+        # set params for destination splines
+        fill_transparency_destination = destination_properties["fill_transparency"]
+
+        if fill_transparency_destination == 0:
+            destination_spline.set_initial_params_filler_material(destination_spline.fill_animate(solid=True))
+
+        # set destination splines to completely drawn
+        destination_spline.set_initial_params_sketch_material(destination_spline.sketch_animate(completion=1))
+
+        # animation
+        hide_start_splines = Hide(start_spline, **params)
+        show_morpher = Show(morpher, **params)
+        morpher_to_background = Transform(morpher, y=-2)
+        morph_completion = ChangeParams(plain_effector, modify_clone=1)
+        blend_color = ChangeColor(morpher, color=sketch_color_destination, fill_color=fill_color_destination, **params)
+        blend_fill = Fill(morpher, transparency=fill_transparency_destination, **params)
+        show_destination_splines = Show(destination_spline, **params)
+        hide_morpher = Hide(morpher, **params)
+
+        if copy:
+            morph_animation_group = AnimationGroup((show_morpher, (0, 0.01)), (morpher_to_background, (0, 0.01)), (morph_completion, (0, 1)), (blend_color, (0, 1)), (blend_fill, (0, 1)), (show_destination_splines, (0.99, 1)), (hide_morpher, (0.99, 1)))
+        else:
+            morph_animation_group = AnimationGroup((hide_start_splines, (0, 0.01)), (show_morpher, (0, 0.01)), (morph_completion, (0, 1)), (blend_color, (0, 1)), (blend_fill, (0, 1)), (show_destination_splines, (0.99, 1)), (hide_morpher, (0.99, 1)))
+        
+        morph_animation_group.helper_objects = [*mosplines, plain_effector, morpher]
+
+        return morph_animation_group
+
+
 class CreateEye(Draw, Fill):
 
     category = "constructive"
@@ -479,8 +719,8 @@ class CreateEye(Draw, Fill):
             eyelids = eye.components["eyelids"]
             eyeball = eye.components["eyeball"]
             # set initial parameters
-            iris.set_initial_params_filler_material(iris.fill(transparency=1))
-            pupil.set_initial_params_filler_material(pupil.fill(transparency=1))
+            iris.set_initial_params_filler_material(iris.fill_animate(transparency=1))
+            pupil.set_initial_params_filler_material(pupil.fill_animate(transparency=1))
             # gather animations
             fill_iris = Fill(iris, solid=True, **params)
             fill_pupil = Fill(pupil, solid=True, **params)
@@ -548,13 +788,13 @@ class CreateLogo(Draw, FadeIn):
             small_circle.set_initial_params_object(small_circle.transform(z=logo.focal_height, relative=False))
             small_circle.set_initial_params_object(small_circle.change_params(radius=0))
             # gather animations
-            draw_main_circle = Draw(main_circle, **params)
+            fade_in_main_circle = FadeIn(main_circle, **params)
             draw_lines = Draw(lines, smoothing_right=0, **params)
             fade_in_small_circle = FadeIn(small_circle, smoothing_left=0.1, **params)
             radius_small_circle = ChangeParams(small_circle, radius=logo.small_circle_radius, smoothing_left=0, **params)
             transform_small_circle = Transform(small_circle, z=logo.small_circle_center_height, relative=False, smoothing_left=0, **params)
             # combine to animation group
-            logo_creation = AnimationGroup((draw_main_circle, (0, 0.4)), (draw_lines, (0.4, 0.7)), (radius_small_circle, (0.7, 1)), (transform_small_circle, (0.7, 1)), (fade_in_small_circle, (0.7, 1)))
+            logo_creation = AnimationGroup((fade_in_main_circle, (0, 0.4)), (draw_lines, (0.4, 0.7)), (radius_small_circle, (0.7, 1)), (transform_small_circle, (0.7, 1)), (fade_in_small_circle, (0.7, 1)))
             logo_creation_rescaled = AnimationGroup((logo_creation, (rel_start_point, rel_end_point)))
 
             # pass params for later completion in play method
@@ -579,11 +819,11 @@ class UnCreateLogo(Draw, FadeIn):
             small_circle = logo.components["small_circle"]
             lines = logo.components["lines"]
             # gather animations
-            undraw_main_circle = UnDraw(main_circle, **params)
+            fade_out_main_circle = FadeOut(main_circle, **params)
             undraw_lines = UnDraw(lines, **params)
             fade_out_small_circle = FadeOut(small_circle, **params)
             # combine to animation group
-            logo_uncreation = AnimationGroup((undraw_main_circle, (0.6, 1)), (undraw_lines, (0.3, 0.6)), (fade_out_small_circle, (0, 0.3)))
+            logo_uncreation = AnimationGroup((fade_out_main_circle, (0.6, 1)), (undraw_lines, (0.3, 0.6)), (fade_out_small_circle, (0, 0.3)))
             logo_uncreation_rescaled = AnimationGroup((logo_uncreation, (rel_start_point, rel_end_point)))
 
             # pass params for later completion in play method
@@ -606,11 +846,23 @@ class CreateAxes(Draw):
             # gather animations
             draw_axes = [Draw(axis, **params)
                          for axis in axes.components["axes"]]
-            if "ticks" in axes.components:
-                draw_ticks = [Domino(ticks, Draw, rel_duration=0.3, **params)
+            if "grid" in axes.components and "ticks" in axes.components:
+                draw_grid = [Domino(Draw, grid, rel_duration=0.3, **params)
+                              for grid in axes.components["grid"]]
+                draw_ticks = [Domino(Draw, ticks, rel_duration=0.3, **params)
                               for ticks in axes.components["ticks"]]
                 # combine to animation group
-                axes_creation = AnimationGroup((draw_axes, (0, 0.9)), (draw_ticks, (0.3, 1)))
+                axes_creation = AnimationGroup((draw_axes, (0, 0.8)), (draw_grid, (0, 1)), (draw_ticks, (0.3, 1)))
+            elif "ticks" in axes.components:
+                draw_ticks = [Domino(Draw, ticks, rel_duration=0.3, **params)
+                              for ticks in axes.components["ticks"]]
+                # combine to animation group
+                axes_creation = AnimationGroup((draw_axes, (0, 0.8)), (draw_ticks, (0.3, 1)))
+            elif "grid" in axes.components:
+                draw_grid = [Domino(Draw, grid, rel_duration=0.3, **params)
+                              for grid in axes.components["grid"]]
+                # combine to animation group
+                axes_creation = AnimationGroup((draw_axes, (0, 0.8)), (draw_grid, (0, 1)))
             else:
                 # combine to animation group
                 axes_creation = AnimationGroup((draw_axes, (0, 1)))
@@ -626,7 +878,7 @@ class CreateAxes(Draw):
 
         return axes_creations
 
-class UnCreateAxes(Draw):
+class UnCreateAxes(Erase):
 
     category = "destructive"
 
@@ -638,11 +890,23 @@ class UnCreateAxes(Draw):
             # gather animations
             erase_axes = [Erase(axis, **params)
                           for axis in axes.components["axes"]]
-            if "ticks" in axes.components:
-                erase_ticks = [Domino(ticks, Erase, rel_duration=0.3, **params)
+            if "grid" in axes.components and "ticks" in axes.components:
+                erase_grid = [Domino(Erase, grid, rel_duration=0.3, **params)
+                              for grid in axes.components["grid"]]
+                erase_ticks = [Domino(Erase, ticks, rel_duration=0.3, **params)
+                              for ticks in axes.components["ticks"]]
+                # combine to animation group
+                axes_uncreation = AnimationGroup((erase_axes, (0, 1)), (erase_grid, (0, 1)), (erase_ticks, (0, 0.7)))
+            elif "ticks" in axes.components:
+                erase_ticks = [Domino(Erase, ticks, rel_duration=0.3, **params)
                                for ticks in axes.components["ticks"]]
                 # combine to animation group
                 axes_uncreation = AnimationGroup((erase_axes, (0, 1)), (erase_ticks, (0, 0.7)))
+            elif "grid" in axes.components:
+                erase_grid = [Domino(Erase, grid, rel_duration=0.3, **params)
+                               for grid in axes.components["grid"]]
+                # combine to animation group
+                axes_uncreation = AnimationGroup((erase_axes, (0, 1)), (erase_grid, (0, 1)))
             else:
                 # combine to animation group
                 axes_uncreation = AnimationGroup((erase_axes, (0, 1)))
@@ -666,18 +930,52 @@ class Create(CreateEye):
         creations = []
         # execute respective creation animator for cobjects
         for cobject in cobjects:
-            if cobject.__class__.__name__ == "Eye":
-                eye_creation = CreateEye(cobject, **params)
-                creations.append(eye_creation)
-            elif cobject.__class__.__name__ == "Logo":
-                logo_creation = CreateLogo(cobject, **params)
-                creations.append(logo_creation)
-            elif cobject.__class__.__name__ == "Axes":
-                axes_creation = CreateAxes(cobject, **params)
-                creations.append(axes_creation)
+            # check for group
+            if cobject.__class__.__name__ == "Group":
+                for child in cobject.children:
+                    if child.__class__.__name__ == "Eye":
+                        eye_creation = CreateEye(child, **params)
+                        creations.append(eye_creation)
+                    elif child.__class__.__name__ == "Logo":
+                        logo_creation = CreateLogo(child, **params)
+                        creations.append(logo_creation)
+                    elif child.__class__.__name__ == "Axes":
+                        axes_creation = CreateAxes(child, **params)
+                        creations.append(axes_creation)
+                    elif child.__class__.__name__ == "CustomText":
+                        text_creation = Write(child, **params)
+                        creations.append(text_creation)
+                    elif child.__class__.__name__ == "System":
+                        system_creation = DrawThenFillCompletely(child, **params)
+                        creations.append(system_creation)
+                    elif child.__class__.__bases__[0].__name__ == "SVG":
+                        vg_creation = DrawThenFillCompletely(child, **params)
+                        creations.append(vg_creation)
+                    else:
+                        generic_creation = Draw(child, **params)
+                        creations.append(generic_creation)
             else:
-                generic_creation = Draw(cobject, **params)
-                creations.append(generic_creation)
+                if cobject.__class__.__name__ == "Eye":
+                    eye_creation = CreateEye(cobject, **params)
+                    creations.append(eye_creation)
+                elif cobject.__class__.__name__ == "Logo":
+                    logo_creation = CreateLogo(cobject, **params)
+                    creations.append(logo_creation)
+                elif cobject.__class__.__name__ == "Axes":
+                    axes_creation = CreateAxes(cobject, **params)
+                    creations.append(axes_creation)
+                elif cobject.__class__.__name__ == "CustomText":
+                    text_creation = Write(cobject, **params)
+                    creations.append(text_creation)
+                elif cobject.__class__.__name__ == "System":
+                    system_creation = DrawThenFillCompletely(cobject, **params)
+                    creations.append(system_creation)
+                elif cobject.__class__.__bases__[0].__name__ == "SVG":
+                    vg_creation = DrawThenFillCompletely(cobject, **params)
+                    creations.append(vg_creation)
+                else:
+                    generic_creation = Draw(cobject, **params)
+                    creations.append(generic_creation)
 
         return creations
 
@@ -688,18 +986,52 @@ class UnCreate(CreateEye):
         uncreations = []
         # execute respective creation animator for cobjects
         for cobject in cobjects:
-            if cobject.__class__.__name__ == "Eye":
-                eye_uncreation = UnCreateEye(cobject, **params)
-                uncreations.append(eye_uncreation)
-            elif cobject.__class__.__name__ == "Logo":
-                logo_uncreation = UnCreateLogo(cobject, **params)
-                uncreations.append(logo_uncreation)
-            elif cobject.__class__.__name__ == "Axes":
-                axes_uncreation = UnCreateAxes(cobject, **params)
-                uncreations.append(axes_uncreation)
+            # check for group
+            if cobject.__class__.__name__ == "Group":
+                for child in cobject.children:
+                    if child.__class__.__name__ == "Eye":
+                        eye_uncreation = UnCreateEye(child, **params)
+                        uncreations.append(eye_uncreation)
+                    elif child.__class__.__name__ == "Logo":
+                        logo_uncreation = UnCreateLogo(child, **params)
+                        uncreations.append(logo_uncreation)
+                    elif child.__class__.__name__ == "Axes":
+                        axes_uncreation = UnCreateAxes(child, **params)
+                        uncreations.append(axes_uncreation)
+                    elif child.__class__.__name__ == "CustomText":
+                        text_uncreation = UnWrite(child, **params)
+                        uncreations.append(text_uncreation)
+                    elif child.__class__.__name__ == "System":
+                        system_uncreation = UnFillThenUnDraw(child, **params)
+                        uncreations.append(system_uncreation)
+                    elif child.__class__.__bases__[0].__name__ == "SVG":
+                        vg_uncreation = UnFillThenUnDraw(child, **params)
+                        uncreations.append(vg_uncreation)
+                    else:
+                        generic_uncreation = UnDraw(child, **params)
+                        uncreations.append(generic_uncreation)
             else:
-                generic_uncreation = UnDraw(cobject, **params)
-                uncreations.append(generic_uncreation)
+                if cobject.__class__.__name__ == "Eye":
+                    eye_uncreation = UnCreateEye(cobject, **params)
+                    uncreations.append(eye_uncreation)
+                elif cobject.__class__.__name__ == "Logo":
+                    logo_uncreation = UnCreateLogo(cobject, **params)
+                    uncreations.append(logo_uncreation)
+                elif cobject.__class__.__name__ == "Axes":
+                    axes_uncreation = UnCreateAxes(cobject, **params)
+                    uncreations.append(axes_uncreation)
+                elif cobject.__class__.__name__ == "CustomText":
+                    text_uncreation = UnWrite(cobject, **params)
+                    uncreations.append(text_uncreation)
+                elif cobject.__class__.__name__ == "System":
+                    system_uncreation = UnFillThenUnDraw(cobject, **params)
+                    uncreations.append(system_uncreation)
+                elif cobject.__class__.__bases__[0].__name__ == "SVG":
+                    vg_uncreation = UnFillThenUnDraw(cobject, **params)
+                    uncreations.append(vg_uncreation)
+                else:
+                    generic_uncreation = UnDraw(cobject, **params)
+                    uncreations.append(generic_uncreation)
 
         return uncreations
 

@@ -1,8 +1,11 @@
 import c4d
+import numpy as np
 
 # helper functions
-def average(color1, color2):
 
+
+def average(color1, color2):
+    # gives the correct average of two colors
     x1 = color1.x
     y1 = color1.y
     z1 = color1.z
@@ -20,9 +23,17 @@ def average(color1, color2):
     return average_color
 
 
+def polar2cartesian(r, phi):
+    # converts polar to cartesian coordinates
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+
+    return x, y
+
+
 # meta data
-CONTENT_PATH = "/Users/davidrug/Documents/Ataraxia/OpenIdeation/YouTubeChannel/Content"
-PROJECTS_PATH = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R24_36E19156/library/scripts/PydeationProjects"
+CONTENT_PATH = "/Users/davidrug/Documents/Ataraxia/ProjectLiminality/YouTubeChannel/videos"
+PROJECTS_PATH = "/Users/davidrug/Library/Preferences/Maxon/Maxon Cinema 4D R25_EBA43BEE/library/scripts/PydeationProjects"
 
 # material related constants
 BLUE = c4d.Vector(0, 153, 204) / 255
@@ -35,6 +46,11 @@ BLACK = c4d.Vector(0, 0, 0)
 
 FILLER_TRANSPARENCY = 0.93
 
+VG_THICKNESS = 5
+TEXT_THICKNESS = 5
+PRIM_THICKNESS = 5
+SPLINE_THICKNESS = 3
+
 
 # math
-PI = 3.14159  # use np.pi once pip install is working
+PI = np.pi  # use np.pi once pip install is working

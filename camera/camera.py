@@ -51,27 +51,37 @@ class Camera(CObject):
 
 class TwoDCamera(Camera):
 
-    def __init__(self):
+    def __init__(self, x=0, y=0, z=0, zoom=1):
         # create object
         self.obj = c4d.CameraObject()
         # set projection to top
         self.obj[c4d.CAMERA_PROJECTION] = 6
+        # set user params
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_X] = x
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Z] = z
+        self.obj[c4d.CAMERA_ZOOM] = zoom
+
 
 class ThreeDCamera(Camera):
 
-    def __init__(self):
+    def __init__(self, zoom=1, x=0, z=0):
         # create object
         self.obj = c4d.CameraObject()
         # set coordinates
+        # constant orientation correction
         self.obj[c4d.ID_BASEOBJECT_REL_ROTATION, c4d.VECTOR_Y] = -PI / 2
-        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = 1000
+        # set zoom by tweaking distance
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Y] = 1000 / zoom
+        # set horizontal position
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_X] = x
+        # set vertical position
+        self.obj[c4d.ID_BASEOBJECT_REL_POSITION, c4d.VECTOR_Z] = z
 
     def change_params(self, zoom=1, offset_x=0, offset_y=0, relative=True):
         # changes the zoom of the camera
 
         # gather descIds
-        desc_zoom = c4d.DescID(c4d.DescLevel(
-            c4d.CAMERA_FOCUS, c4d.DTYPE_REAL, 0))
+        desc_zoom = CObject.descIds["pos_y"]
         desc_offset_x = c4d.DescID(c4d.DescLevel(
             c4d.CAMERAOBJECT_FILM_OFFSET_X, c4d.DTYPE_REAL, 0))
         desc_offset_y = c4d.DescID(c4d.DescLevel(
@@ -83,14 +93,7 @@ class ThreeDCamera(Camera):
         # read out current values
         curr_values = self.get_current_values(descIds)
 
-        # convert params
-        curr_focal_length, __, __ = curr_values
-
-        if relative:
-            # multiply current focal length by zoom factor
-            zoom = curr_focal_length * zoom
-
-        input_values = [zoom, offset_x, offset_y]
+        input_values = [1000 / zoom, offset_x, offset_y]
         default_values = curr_values
 
         # filter out unchanged variables

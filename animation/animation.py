@@ -57,6 +57,7 @@ class AnimationGroup():
         self.category = "neutral"
         self.cobjects = self.get_cobjects()
         self.params = None
+        self.helper_objects = None
 
     def __iter__(self):
         self.idx = 0
